@@ -1,0 +1,311 @@
+@page "/simulator"
+@using SimuladorCloud.Client.Models
+@using SimuladorCloud.Client.Services
+@inject GraphService GraphService
+@inject CascadeSimulationService CascadeService
+@inject SpofDetectionService SpofService
+@inject TopologyStorageService StorageService
+@implements IDisposable
+
+<PageTitle>Simulador Cloud — Gestión Preventiva de Riesgos</PageTitle>
+
+<div class="simulator-layout">
+
+    <!-- ── Panel izquierdo: controles ─────────────────────────────────── -->
+    <div class="control-panel">
+        <h3>Controles</h3>
+
+        <!-- Agregar nodo -->
+        <div class="card mb-3">
+            <h5>Agregar Nodo</h5>
+            <input class="form-control mb-2" placeholder="Nombre del componente"
+                   @bind="_newNodeName" />
+            <select class="form-control mb-2" @bind="_newNodeType">
+                @foreach (NodeType type in Enum.GetValues<NodeType>())
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+            <button class="btn btn-primary w-100" @onclick="AddNode">
+                + Agregar Nodo
+            </button>
+        </div>
+
+        <!-- Simulación -->
+        <div class="card mb-3">
+            <h5>Simulación</h5>
+            <select class="form-control mb-2" @bind="_selectedNodeId">
+                <option value="">-- Seleccionar nodo inicial --</option>
+                @foreach (var vertex in GraphService.Graph.Vertices)
+                {
+                    <option value="@vertex.Id">@vertex.Name (@vertex.NodeType)</option>
+                }
+            </select>
+            <button class="btn btn-danger w-100 mb-2"
+                    @onclick="RunCascadeSimulation"
+                    disabled="@string.IsNullOrEmpty(_selectedNodeId)">
+                ▶ Simular Cascada
+            </button>
+            <button class="btn btn-warning w-100 mb-2" @onclick="DetectSpofs">
+                🔍 Detectar SPOFs
+            </button>
+            <button class="btn btn-secondary w-100" @onclick="ResetSimulation">
+                ↺ Reiniciar
+            </button>
+        </div>
+
+        <!-- Topologías predefinidas -->
+        <div class="card mb-3">
+            <h5>Topologías de Prueba</h5>
+            <button class="btn btn-outline-primary w-100 mb-2"
+                    @onclick="() => LoadPredefined(0)">
+                Pequeña (8 nodos)
+            </button>
+            <button class="btn btn-outline-primary w-100"
+                    @onclick="() => LoadPredefined(1)">
+                Mediana (20 nodos)
+            </button>
+        </div>
+
+        <!-- Limpiar -->
+        <button class="btn btn-outline-danger w-100" @onclick="ClearGraph">
+            🗑 Limpiar Todo
+        </button>
+    </div>
+
+    <!-- ── Canvas SVG: visualización del grafo ────────────────────────── -->
+    <div class="canvas-container">
+        <svg width="100%" height="600"
+             style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px;">
+
+            <!-- Aristas -->
+            @foreach (var edge in GraphService.Graph.Edges)
+            {
+                var src = GraphService.Graph.GetVertex(edge.SourceId);
+                var tgt = GraphService.Graph.GetVertex(edge.TargetId);
+                if (src is not null && tgt is not null)
+                {
+                    <line x1="@src.PositionX" y1="@src.PositionY"
+                          x2="@tgt.PositionX" y2="@tgt.PositionY"
+                          stroke="@edge.StrokeColor"
+                          stroke-width="@edge.StrokeWidth"
+                          marker-end="url(#arrow)" />
+                }
+            }
+
+            <!-- Flecha para aristas dirigidas -->
+            <defs>
+                <marker id="arrow" markerWidth="8" markerHeight="8"
+                        refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="#718096"/>
+                </marker>
+            </defs>
+
+            <!-- Nodos -->
+            @foreach (var vertex in GraphService.Graph.Vertices)
+            {
+                <g @key="vertex.Id" style="cursor:pointer"
+                   @onclick="() => SelectNode(vertex.Id)">
+
+                    <!-- Círculo del nodo -->
+                    <circle cx="@vertex.PositionX" cy="@vertex.PositionY" r="28"
+                            fill="@vertex.StatusColor"
+                            stroke="@(vertex.IsSpof ? "#B7791F" : "white")"
+                            stroke-width="@(vertex.IsSpof ? 4 : 2)"
+                            opacity="0.9" />
+
+                    <!-- Indicador SPOF -->
+                    @if (vertex.IsSpof)
+                    {
+                        <text x="@(vertex.PositionX + 20)"
+                              y="@(vertex.PositionY - 20)"
+                              font-size="16" fill="#B7791F">⚠</text>
+                    }
+
+                    <!-- Ícono del tipo -->
+                    <text x="@vertex.PositionX" y="@(vertex.PositionY + 4)"
+                          text-anchor="middle" font-size="14"
+                          fill="white">@vertex.TypeIcon</text>
+
+                    <!-- Nombre del nodo -->
+                    <text x="@vertex.PositionX" y="@(vertex.PositionY + 44)"
+                          text-anchor="middle" font-size="11"
+                          fill="#2D3748" font-weight="500">
+                        @(vertex.Name.Length > 14
+                            ? vertex.Name[..12] + "…"
+                            : vertex.Name)
+                    </text>
+                </g>
+            }
+        </svg>
+
+        <!-- Leyenda -->
+        <div class="legend">
+            <span class="legend-item" style="color:#2F855A">● Operativo</span>
+            <span class="legend-item" style="color:#D69E2E">● Degradado</span>
+            <span class="legend-item" style="color:#E53E3E">● Fallido</span>
+            <span class="legend-item" style="color:#B7791F">⚠ SPOF</span>
+        </div>
+    </div>
+
+    <!-- ── Panel derecho: resultados ──────────────────────────────────── -->
+    @if (_showResultsPanel && _lastResult is not null)
+    {
+        <div class="results-panel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Resultados</h5>
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="() => _showResultsPanel = false">✕</button>
+            </div>
+
+            <!-- Alertas -->
+            @if (_lastResult.IsCriticalImpact)
+            {
+                <div class="alert alert-danger">
+                    ⚠ Impacto crítico: @_lastResult.AffectedPercent.ToString("F1")% del sistema afectado
+                </div>
+            }
+            @if (_lastResult.HasSpofs)
+            {
+                <div class="alert alert-warning">
+                    ⚠ @_lastResult.SpofList.Count SPOF(s) detectado(s)
+                </div>
+            }
+
+            <!-- Métricas -->
+            <div class="metrics-grid mb-3">
+                <div class="metric">
+                    <span class="metric-value" style="color:#2F855A">
+                        @GraphService.Graph.OperativeCount
+                    </span>
+                    <span class="metric-label">Operativos</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-value" style="color:#D69E2E">
+                        @GraphService.Graph.DegradedCount
+                    </span>
+                    <span class="metric-label">Degradados</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-value" style="color:#E53E3E">
+                        @GraphService.Graph.FailedCount
+                    </span>
+                    <span class="metric-label">Fallidos</span>
+                </div>
+            </div>
+
+            <!-- Detalle -->
+            <p><strong>Nodos afectados:</strong>
+               @_lastResult.AffectedCount de @GraphService.Graph.NodeCount
+            </p>
+            <p><strong>Tiempo de ejecución:</strong>
+               @_lastResult.ExecutionTimeMs.ToString("F2") ms (WASM)
+            </p>
+            @if (_lastResult.SpofList.Count > 0)
+            {
+                <p><strong>SPOFs detectados:</strong></p>
+                <ul>
+                    @foreach (var spofId in _lastResult.SpofList)
+                    {
+                        var spofNode = GraphService.Graph.GetVertex(spofId);
+                        if (spofNode is not null)
+                        {
+                            <li>@spofNode.Name (@spofNode.NodeType)</li>
+                        }
+                    }
+                </ul>
+            }
+
+            <!-- Botón copiar reporte -->
+            <button class="btn btn-outline-secondary btn-sm w-100 mt-2"
+                    @onclick="CopyReport">
+                📋 Copiar reporte
+            </button>
+        </div>
+    }
+
+</div>
+
+@code {
+    // ── Estado del componente ──────────────────────────────────────────────
+    private string    _newNodeName    = string.Empty;
+    private NodeType  _newNodeType    = NodeType.Service;
+    private string    _selectedNodeId = string.Empty;
+    private bool      _showResultsPanel = false;
+    private SimulationResult? _lastResult;
+
+    protected override void OnInitialized()
+    {
+        GraphService.OnGraphChanged += StateHasChanged;
+    }
+
+    // ── Acciones del usuario ───────────────────────────────────────────────
+
+    private void AddNode()
+    {
+        if (string.IsNullOrWhiteSpace(_newNodeName)) return;
+
+        // Posición aleatoria dentro del canvas
+        var rnd = new Random();
+        GraphService.AddVertex(_newNodeName, _newNodeType,
+            x: rnd.Next(80, 700), y: rnd.Next(80, 500));
+        _newNodeName = string.Empty;
+    }
+
+    private void SelectNode(string id)
+    {
+        _selectedNodeId = id;
+        StateHasChanged();
+    }
+
+    private void RunCascadeSimulation()
+    {
+        if (string.IsNullOrEmpty(_selectedNodeId)) return;
+        _lastResult       = CascadeService.SimulateCascade(_selectedNodeId);
+        _showResultsPanel = true;
+    }
+
+    private void DetectSpofs()
+    {
+        var spofs = SpofService.DetectSpofs();
+        _lastResult = new SimulationResult
+        {
+            Type    = SimulationType.SpofAnalysis,
+            SpofList = spofs.Select(v => v.Id).ToList()
+        };
+        _showResultsPanel = true;
+    }
+
+    private void ResetSimulation()
+    {
+        GraphService.ResetSimulation();
+        _lastResult       = null;
+        _showResultsPanel = false;
+        _selectedNodeId   = string.Empty;
+    }
+
+    private void ClearGraph()
+    {
+        GraphService.ClearGraph();
+        ResetSimulation();
+    }
+
+    private void LoadPredefined(int index)
+    {
+        GraphService.LoadPredefinedTopology(index);
+        ResetSimulation();
+    }
+
+    private void CopyReport()
+    {
+        // Implementación via JS Interop en versión completa
+        // Por ahora muestra el resumen en consola
+        if (_lastResult is not null)
+            Console.WriteLine(_lastResult.GenerateSummary());
+    }
+
+    public void Dispose()
+    {
+        GraphService.OnGraphChanged -= StateHasChanged;
+    }
+}

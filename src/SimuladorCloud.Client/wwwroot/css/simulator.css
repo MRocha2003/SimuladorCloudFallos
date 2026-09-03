@@ -1,0 +1,112 @@
+/* ── Layout principal del simulador ────────────────────────────────────────── */
+.simulator-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    gap: 16px;
+    padding: 16px;
+    min-height: calc(100vh - 60px);
+}
+
+/* ── Panel de controles izquierdo ──────────────────────────────────────────── */
+.control-panel {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+    height: fit-content;
+}
+
+.control-panel h3 {
+    color: #1A56A0;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1A56A0;
+}
+
+.control-panel .card {
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.control-panel h5 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4A5568;
+    margin-bottom: 10px;
+}
+
+/* ── Canvas SVG ────────────────────────────────────────────────────────────── */
+.canvas-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ── Leyenda del canvas ────────────────────────────────────────────────────── */
+.legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    padding: 8px;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.legend-item {
+    font-weight: 500;
+}
+
+/* ── Panel de resultados derecho ───────────────────────────────────────────── */
+.results-panel {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+    height: fit-content;
+}
+
+.results-panel h5 {
+    color: #1A56A0;
+    font-weight: 700;
+}
+
+/* ── Grid de métricas ──────────────────────────────────────────────────────── */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 10px 4px;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: #718096;
+    margin-top: 2px;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .simulator-layout {
+        grid-template-columns: 1fr;
+    }
+}
