@@ -1,0 +1,70 @@
+@page "/"
+
+<PageTitle>SimuladorCloud — Inicio</PageTitle>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<div class="hero">
+    <div class="hero-icon">⬡</div>
+    <h1 class="hero-title">Sistema Simulador Web de Fallos en Cascada</h1>
+    <p class="hero-subtitle">
+        Gestión Preventiva de Riesgos en Ecosistemas Cloud Públicos<br />
+        basado en la Teoría de Grafos
+    </p>
+    <a href="/simulator" class="btn btn-light"
+       style="font-weight:700; font-size:1rem; padding:10px 28px; border-radius:8px;">
+        🚀 Abrir Simulador
+    </a>
+</div>
+
+<!-- ── Cards de características ─────────────────────────────────────────── -->
+<div style="max-width:1000px; margin:32px auto; padding:0 24px;
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+            gap:20px;">
+
+    <div class="card" style="border-top: 4px solid #1A56A0;">
+        <h5 style="color:#1A56A0;">⬡ Modelado de Grafos G=(V,E)</h5>
+        <p style="color:#718096; font-size:0.875rem; margin-top:8px;">
+            Representa tu infraestructura Cloud como un grafo dirigido.
+            Nodos = componentes (servicios, DBs, APIs).
+            Aristas = dependencias entre componentes.
+        </p>
+    </div>
+
+    <div class="card" style="border-top: 4px solid #E53E3E;">
+        <h5 style="color:#E53E3E;">🔴 Simulación de Cascadas BFS/DFS</h5>
+        <p style="color:#718096; font-size:0.875rem; margin-top:8px;">
+            Inyecta un fallo en cualquier nodo y observa cómo se propaga
+            en cascada por las dependencias. Algoritmo O(V+E) ejecutado
+            en WebAssembly — sin conexión a nubes reales.
+        </p>
+    </div>
+
+    <div class="card" style="border-top: 4px solid #D69E2E;">
+        <h5 style="color:#D69E2E;">⚠ Detección de SPOFs (Tarjan)</h5>
+        <p style="color:#718096; font-size:0.875rem; margin-top:8px;">
+            Identifica automáticamente los Puntos Únicos de Fallo mediante
+            el algoritmo de Tarjan. Conoce qué componentes son críticos
+            antes de que fallen en producción.
+        </p>
+    </div>
+
+    <div class="card" style="border-top: 4px solid #2F855A;">
+        <h5 style="color:#2F855A;">🔒 Sandbox Aislado</h5>
+        <p style="color:#718096; font-size:0.875rem; margin-top:8px;">
+            Todas las simulaciones se ejecutan en un entorno sandbox
+            completamente aislado. Sin conexión a AWS, Azure ni GCP.
+            Cero riesgo para tu infraestructura real.
+        </p>
+    </div>
+
+</div>
+
+<!-- ── Tecnologías ─────────────────────────────────────────────────────── -->
+<div style="text-align:center; padding:0 24px 40px; color:#718096; font-size:0.8rem;">
+    <strong style="color:#4A5568;">Tecnologías:</strong>
+    &nbsp; Blazor WebAssembly · .NET 8 · C# · QuikGraph · Blazored.LocalStorage · SVG nativo
+    <br />
+    <span style="margin-top:6px; display:block;">
+        Universidad Adventista de Bolivia · Ingeniería de Sistemas · 2025
+    </span>
+</div>

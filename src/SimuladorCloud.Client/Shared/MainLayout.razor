@@ -1,0 +1,146 @@
+@inherits LayoutComponentBase
+
+<div class="app-wrapper">
+    <!-- ── Barra de navegación superior ──────────────────────────────────── -->
+    <header class="navbar">
+        <div class="navbar-brand">
+            <span class="brand-icon">⬡</span>
+            <div class="brand-text">
+                <span class="brand-title">SimuladorCloud</span>
+                <span class="brand-subtitle">Gestión Preventiva de Riesgos · UAB</span>
+            </div>
+        </div>
+        <nav class="navbar-links">
+            <a href="/simulator" class="nav-link">🖥 Simulador</a>
+            <a href="/topologies" class="nav-link">📂 Topologías</a>
+            <a href="/about" class="nav-link">ℹ Acerca de</a>
+        </nav>
+        <div class="navbar-badge">
+            <span class="badge-sandbox">🔒 SANDBOX</span>
+        </div>
+    </header>
+
+    <!-- ── Contenido principal ────────────────────────────────────────────── -->
+    <main class="main-content">
+        @Body
+    </main>
+
+    <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+    <footer class="app-footer">
+        <span>Sistema Simulador Web · Teoría de Grafos · Blazor WebAssembly .NET 8</span>
+        <span>David Manuel Rocha Crespo · Universidad Adventista de Bolivia · 2025</span>
+    </footer>
+</div>
+
+<style>
+    /* ── Reset y base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: #F0F4F8;
+        color: #1A202C;
+        min-height: 100vh;
+    }
+
+    .app-wrapper {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    /* ── Navbar ─────────────────────────────────────────────────────────── */
+    .navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #0B1F4B;
+        padding: 0 24px;
+        height: 56px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: white;
+    }
+
+    .brand-icon {
+        font-size: 1.8rem;
+        color: #00A8CC;
+    }
+
+    .brand-text {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .brand-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: white;
+        letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+        font-size: 0.68rem;
+        color: #8FB8D8;
+        font-style: italic;
+    }
+
+    .navbar-links {
+        display: flex;
+        gap: 8px;
+    }
+
+    .nav-link {
+        color: #CBD5E1;
+        text-decoration: none;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-link:hover {
+        background: rgba(255,255,255,0.12);
+        color: white;
+    }
+
+    .badge-sandbox {
+        background: #065F46;
+        color: #6EE7B7;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.8px;
+        border: 1px solid #34D399;
+    }
+
+    /* ── Main ───────────────────────────────────────────────────────────── */
+    .main-content {
+        flex: 1;
+        padding: 0;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    .app-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #0B1F4B;
+        color: #8FB8D8;
+        font-size: 0.75rem;
+        padding: 10px 24px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+</style>
