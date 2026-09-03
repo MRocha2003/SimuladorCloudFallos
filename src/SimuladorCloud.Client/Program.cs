@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Blazored.LocalStorage;
 using SimuladorCloud.Client.Services;
+using Microsoft.AspNetCore.Components.Web;
+using SimuladorCloud.Client;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // ── Registrar servicios del simulador ─────────────────────────────────────────
 

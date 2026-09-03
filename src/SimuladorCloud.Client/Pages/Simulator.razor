@@ -117,24 +117,24 @@
                     <!-- Indicador SPOF -->
                     @if (vertex.IsSpof)
                     {
-                        <text x="@(vertex.PositionX + 20)"
-                              y="@(vertex.PositionY - 20)"
-                              font-size="16" fill="#B7791F">⚠</text>
+                        <svg:text x="@(vertex.PositionX + 20)"
+                                  y="@(vertex.PositionY - 20)"
+                                  font-size="16" fill="#B7791F">⚠</svg:text>
                     }
 
                     <!-- Ícono del tipo -->
-                    <text x="@vertex.PositionX" y="@(vertex.PositionY + 4)"
-                          text-anchor="middle" font-size="14"
-                          fill="white">@vertex.TypeIcon</text>
+                    <svg:text x="@vertex.PositionX" y="@(vertex.PositionY + 4)"
+                              text-anchor="middle" font-size="14"
+                              fill="white">@vertex.TypeIcon</svg:text>
 
                     <!-- Nombre del nodo -->
-                    <text x="@vertex.PositionX" y="@(vertex.PositionY + 44)"
-                          text-anchor="middle" font-size="11"
-                          fill="#2D3748" font-weight="500">
+                    <svg:text x="@vertex.PositionX" y="@(vertex.PositionY + 44)"
+                              text-anchor="middle" font-size="11"
+                              fill="#2D3748" font-weight="500">
                         @(vertex.Name.Length > 14
                             ? vertex.Name[..12] + "…"
                             : vertex.Name)
-                    </text>
+                    </svg:text>
                 </g>
             }
         </svg>
