@@ -12,6 +12,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Persistencia en localStorage (RNF-03, RNF-09)
 builder.Services.AddBlazoredLocalStorage();
+builder.Services.AddScoped<IKeyValueStore, LocalStorageKeyValueStore>();
 
 // Servicio principal de gestión del grafo G=(V,E) (RF-01, RF-02, RF-03)
 builder.Services.AddSingleton<GraphService>();

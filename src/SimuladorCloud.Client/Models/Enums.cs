@@ -50,3 +50,21 @@ public enum SimulationType
     /// <summary>Identificación de rutas críticas por centralidad de intermediación.</summary>
     CriticalPath
 }
+
+/// <summary>
+/// Resultado de validar la creación de una arista dirigida (HU-02).
+/// </summary>
+public enum EdgeValidation
+{
+    /// <summary>La arista puede crearse.</summary>
+    Valid,
+
+    /// <summary>El nodo origen o el destino no existe.</summary>
+    MissingVertex,
+
+    /// <summary>El origen y el destino son el mismo nodo (auto-bucle).</summary>
+    SelfLoop,
+
+    /// <summary>Ya existe una arista con el mismo origen y destino.</summary>
+    Duplicate
+}

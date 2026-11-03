@@ -51,10 +51,12 @@ public class CascadeSimulationService
         {
             var currentId = queue.Dequeue();
 
-            // Propagar hacia todos los nodos que dependen del nodo actual
-            foreach (var edge in graph.GetOutgoingEdges(currentId))
+            // Propagar hacia todos los nodos que dependen del nodo actual.
+            // Una arista e(u,v) significa que u depende de v: si v falla,
+            // el fallo se propaga a u (origen de las aristas entrantes de v).
+            foreach (var edge in graph.GetIncomingEdges(currentId).ToList())
             {
-                var dependent = graph.GetVertex(edge.TargetId);
+                var dependent = graph.GetVertex(edge.SourceId);
                 if (dependent is null || dependent.Status == NodeStatus.Failed)
                     continue;
 

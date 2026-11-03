@@ -1,4 +1,3 @@
-using Blazored.LocalStorage;
 using SimuladorCloud.Client.Models;
 using System.Text.Json;
 
@@ -13,7 +12,7 @@ namespace SimuladorCloud.Client.Services;
 /// </summary>
 public class TopologyStorageService
 {
-    private readonly ILocalStorageService _localStorage;
+    private readonly IKeyValueStore _store;
     private const string TopologyListKey  = "simulador_topologies";
     private const string ResultListKey    = "simulador_results";
 
@@ -23,9 +22,9 @@ public class TopologyStorageService
         WriteIndented               = false
     };
 
-    public TopologyStorageService(ILocalStorageService localStorage)
+    public TopologyStorageService(IKeyValueStore store)
     {
-        _localStorage = localStorage;
+        _store = store;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -48,7 +47,7 @@ public class TopologyStorageService
         else
             topologies.Add(graph.DeepClone());
 
-        await _localStorage.SetItemAsync(TopologyListKey,
+        await _store.SetStringAsync(TopologyListKey,
             JsonSerializer.Serialize(topologies, JsonOptions));
     }
 
@@ -69,7 +68,7 @@ public class TopologyStorageService
     {
         try
         {
-            var json = await _localStorage.GetItemAsStringAsync(TopologyListKey);
+            var json = await _store.GetStringAsync(TopologyListKey);
             if (string.IsNullOrEmpty(json)) return new List<GraphModel>();
             return JsonSerializer.Deserialize<List<GraphModel>>(json, JsonOptions)
                    ?? new List<GraphModel>();
@@ -89,7 +88,7 @@ public class TopologyStorageService
         var removed    = topologies.RemoveAll(t => t.TopologyId == topologyId);
         if (removed == 0) return false;
 
-        await _localStorage.SetItemAsync(TopologyListKey,
+        await _store.SetStringAsync(TopologyListKey,
             JsonSerializer.Serialize(topologies, JsonOptions));
         return true;
     }
@@ -110,7 +109,7 @@ public class TopologyStorageService
         if (results.Count > 50)
             results = results.OrderByDescending(r => r.Timestamp).Take(50).ToList();
 
-        await _localStorage.SetItemAsync(ResultListKey,
+        await _store.SetStringAsync(ResultListKey,
             JsonSerializer.Serialize(results, JsonOptions));
     }
 
@@ -121,7 +120,7 @@ public class TopologyStorageService
     {
         try
         {
-            var json = await _localStorage.GetItemAsStringAsync(ResultListKey);
+            var json = await _store.GetStringAsync(ResultListKey);
             if (string.IsNullOrEmpty(json)) return new List<SimulationResult>();
             return JsonSerializer.Deserialize<List<SimulationResult>>(json, JsonOptions)
                    ?? new List<SimulationResult>();
@@ -136,5 +135,5 @@ public class TopologyStorageService
     /// Elimina todos los resultados guardados en localStorage.
     /// </summary>
     public async Task ClearResultsAsync() =>
-        await _localStorage.RemoveItemAsync(ResultListKey);
+        await _store.RemoveAsync(ResultListKey);
 }

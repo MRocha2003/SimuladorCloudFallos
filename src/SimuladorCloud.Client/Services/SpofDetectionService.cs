@@ -43,6 +43,10 @@ public class SpofDetectionService
 
         if (n == 0) return new List<Vertex>();
 
+        // Limpiar el resultado de un análisis anterior
+        foreach (var vertex in _vertices) vertex.IsSpof = false;
+        graph.Spofs.Clear();
+
         var stopwatch = Stopwatch.StartNew();
 
         // Inicializar estructuras del algoritmo

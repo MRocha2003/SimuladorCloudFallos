@@ -55,8 +55,8 @@ SimuladorCloudFallos/
 │   │   │   └── Simulator.razor         ← Página principal del simulador
 │   │   └── wwwroot/css/
 │   │       └── simulator.css           ← Estilos del simulador
-│   └── SimuladorCloud.Server/          ← Shell Blazor Server
-├── docs/                               ← Documentación técnica
+├── tests/
+│   └── SimuladorCloud.Tests/           ← Pruebas xUnit (unitarias) y bUnit (integración)
 ├── README.md
 ├── .gitignore
 └── SimuladorCloud.sln
@@ -187,3 +187,21 @@ MIT License — ver archivo [LICENSE](LICENSE)
 Estudiante — Ingeniería de Sistemas  
 Universidad Adventista de Bolivia (UAB)  
 Vinto, Cochabamba, Bolivia
+
+
+---
+
+## 🧪 Pruebas
+
+Proyecto `tests/SimuladorCloud.Tests` (xUnit + bUnit + coverlet):
+
+- `Unit/` — pruebas unitarias de `GraphService`, `CascadeSimulationService` y `SpofDetectionService`.
+- `Integration/` — pruebas de integración de la persistencia (`TopologyStorageService` con almacén en memoria) y de la página `Simulator` con bUnit.
+
+```bash
+dotnet test                     # ejecutar todas las pruebas
+./run-tests.ps1                 # Windows: pruebas + reporte de cobertura HTML
+./run-tests.sh                  # Linux/macOS: pruebas + reporte de cobertura HTML
+```
+
+El reporte de cobertura queda en `TestResults/CoverageReport/index.html`.
