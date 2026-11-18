@@ -5,6 +5,7 @@
 @inject CascadeSimulationService CascadeService
 @inject SpofDetectionService SpofService
 @inject TopologyStorageService StorageService
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Simulador Cloud — Gestión Preventiva de Riesgos</PageTitle>
@@ -15,150 +16,239 @@
     <div class="control-panel">
         <h3>Controles</h3>
 
-        <!-- Agregar nodo -->
+        <!-- IT-1 · HU-01: agregar nodo -->
         <div class="card mb-3">
-            <h5>Agregar Nodo</h5>
-            <input class="form-control mb-2" placeholder="Nombre del componente"
+            <h5>Agregar nodo</h5>
+            <input id="new-node-name" class="form-control mb-2" placeholder="Nombre del componente"
                    @bind="_newNodeName" />
-            <select class="form-control mb-2" @bind="_newNodeType">
+            <select id="new-node-type" class="form-control mb-2" @bind="_newNodeType">
                 @foreach (NodeType type in Enum.GetValues<NodeType>())
                 {
                     <option value="@type">@type</option>
                 }
             </select>
-            <button class="btn btn-primary w-100" @onclick="AddNode">
-                + Agregar Nodo
+            <button id="btn-add-node" class="btn btn-primary w-100" @onclick="AddNode">
+                + Agregar nodo
             </button>
         </div>
 
-        <!-- Simulación -->
+        <!-- IT-1 · HU-02: conectar nodos con una arista dirigida -->
+        <div class="card mb-3">
+            <h5>Conectar (dependencia)</h5>
+            <label class="small text-muted">Origen (el que depende)</label>
+            <select id="edge-source" class="form-control mb-2" @bind="_edgeSourceId">
+                <option value="">-- Origen --</option>
+                @foreach (var vertex in GraphService.Graph.Vertices)
+                {
+                    <option value="@vertex.Id">@vertex.Name</option>
+                }
+            </select>
+            <label class="small text-muted">Destino (del que depende)</label>
+            <select id="edge-target" class="form-control mb-2" @bind="_edgeTargetId">
+                <option value="">-- Destino --</option>
+                @foreach (var vertex in GraphService.Graph.Vertices)
+                {
+                    <option value="@vertex.Id">@vertex.Name</option>
+                }
+            </select>
+            <button id="btn-add-edge" class="btn btn-primary w-100" @onclick="AddEdge">
+                → Conectar
+            </button>
+            @if (!string.IsNullOrEmpty(_edgeMessage))
+            {
+                <div id="edge-message" class="alert @(_edgeOk ? "alert-success" : "alert-danger") mt-2 mb-0 py-1 small">
+                    @_edgeMessage
+                </div>
+            }
+        </div>
+
+        <!-- IT-1 · HU-01: editar / eliminar el nodo seleccionado -->
+        @if (SelectedVertex is not null)
+        {
+            <div id="selected-node-card" class="card mb-3">
+                <h5>Nodo seleccionado</h5>
+                <input id="edit-node-name" class="form-control mb-2" @bind="_editName" />
+                <select id="edit-node-type" class="form-control mb-2" @bind="_editType">
+                    @foreach (NodeType type in Enum.GetValues<NodeType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+                <button id="btn-edit-node" class="btn btn-outline-primary w-100 mb-2" @onclick="SaveNodeChanges">
+                    ✎ Guardar cambios
+                </button>
+                <button id="btn-delete-node" class="btn btn-outline-danger w-100" @onclick="DeleteSelectedNode">
+                    🗑 Eliminar nodo
+                </button>
+            </div>
+        }
+
+        <!-- IT-3 · HU-05/HU-06: simulación -->
         <div class="card mb-3">
             <h5>Simulación</h5>
-            <select class="form-control mb-2" @bind="_selectedNodeId">
-                <option value="">-- Seleccionar nodo inicial --</option>
+            <select id="sim-origin" class="form-control mb-2" @bind="_selectedNodeId" @bind:after="OnSelectionChanged">
+                <option value="">-- Nodo de origen del fallo --</option>
                 @foreach (var vertex in GraphService.Graph.Vertices)
                 {
                     <option value="@vertex.Id">@vertex.Name (@vertex.NodeType)</option>
                 }
             </select>
-            <button class="btn btn-danger w-100 mb-2"
+            <button id="btn-simulate" class="btn btn-danger w-100 mb-2"
                     @onclick="RunCascadeSimulation"
                     disabled="@string.IsNullOrEmpty(_selectedNodeId)">
-                ▶ Simular Cascada
+                ▶ Simular cascada
             </button>
-            <button class="btn btn-warning w-100 mb-2" @onclick="DetectSpofs">
+            <button id="btn-spof" class="btn btn-warning w-100 mb-2" @onclick="DetectSpofs">
                 🔍 Detectar SPOFs
             </button>
-            <button class="btn btn-secondary w-100" @onclick="ResetSimulation">
+            <button id="btn-reset" class="btn btn-secondary w-100" @onclick="ResetSimulation">
                 ↺ Reiniciar
             </button>
         </div>
 
+        <!-- IT-2 · HU-04: guardar topología en localStorage -->
+        <div class="card mb-3">
+            <h5>Guardar topología</h5>
+            <input id="topology-name" class="form-control mb-2" placeholder="Nombre de la topología"
+                   @bind="_topologyName" />
+            <button id="btn-save-topology" class="btn btn-success w-100" @onclick="SaveTopology">
+                💾 Guardar
+            </button>
+            @if (!string.IsNullOrEmpty(_saveMessage))
+            {
+                <div id="save-message" class="alert alert-success mt-2 mb-0 py-1 small">@_saveMessage</div>
+            }
+        </div>
+
         <!-- Topologías predefinidas -->
         <div class="card mb-3">
-            <h5>Topologías de Prueba</h5>
-            <button class="btn btn-outline-primary w-100 mb-2"
+            <h5>Topologías de prueba</h5>
+            <button id="btn-load-small" class="btn btn-outline-primary w-100 mb-2"
                     @onclick="() => LoadPredefined(0)">
                 Pequeña (8 nodos)
             </button>
-            <button class="btn btn-outline-primary w-100"
+            <button id="btn-load-medium" class="btn btn-outline-primary w-100"
                     @onclick="() => LoadPredefined(1)">
                 Mediana (20 nodos)
             </button>
         </div>
 
-        <!-- Limpiar -->
-        <button class="btn btn-outline-danger w-100" @onclick="ClearGraph">
-            🗑 Limpiar Todo
+        <button id="btn-clear" class="btn btn-outline-danger w-100" @onclick="ClearGraph">
+            🗑 Limpiar todo
         </button>
     </div>
 
-    <!-- ── Canvas SVG: visualización del grafo ────────────────────────── -->
+    <!-- ── Canvas SVG: visualización interactiva del grafo (IT-2 · HU-03) ── -->
     <div class="canvas-container">
-        <svg width="100%" height="600"
-             style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px;">
+        <svg id="graph-canvas" width="100%" height="600"
+             style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; user-select:none; touch-action:none;"
+             @onpointermove="OnPointerMove"
+             @onpointerup="EndDrag"
+             @onpointerleave="EndDrag">
 
-            <!-- Aristas -->
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10"
+                        refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#718096" />
+                </marker>
+                <marker id="arrow-red" markerWidth="10" markerHeight="10"
+                        refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#E53E3E" />
+                </marker>
+            </defs>
+
+            <!-- Aristas: se recortan al borde del círculo para que la flecha sea visible -->
             @foreach (var edge in GraphService.Graph.Edges)
             {
                 var src = GraphService.Graph.GetVertex(edge.SourceId);
                 var tgt = GraphService.Graph.GetVertex(edge.TargetId);
                 if (src is not null && tgt is not null)
                 {
-                    <line x1="@src.PositionX" y1="@src.PositionY"
-                          x2="@tgt.PositionX" y2="@tgt.PositionY"
+                    var (x1, y1, x2, y2) = TrimToRadius(src, tgt, NodeRadius + 2);
+                    <line class="graph-edge" data-edge-id="@edge.Id"
+                          x1="@F(x1)" y1="@F(y1)" x2="@F(x2)" y2="@F(y2)"
                           stroke="@edge.StrokeColor"
                           stroke-width="@edge.StrokeWidth"
-                          marker-end="url(#arrow)" />
+                          marker-end="@(edge.IsCascadePath ? "url(#arrow-red)" : "url(#arrow)")" />
                 }
             }
-
-            <!-- Flecha para aristas dirigidas -->
-            <defs>
-                <marker id="arrow" markerWidth="8" markerHeight="8"
-                        refX="6" refY="3" orient="auto">
-                    <path d="M0,0 L0,6 L8,3 z" fill="#718096"/>
-                </marker>
-            </defs>
 
             <!-- Nodos -->
             @foreach (var vertex in GraphService.Graph.Vertices)
             {
-                <g @key="vertex.Id" style="cursor:pointer"
+                <g @key="vertex.Id" class="graph-node" data-node-id="@vertex.Id"
+                   style="cursor:@(_dragId == vertex.Id ? "grabbing" : "grab")"
+                   @onpointerdown="(PointerEventArgs e) => StartDrag(e, vertex.Id)"
                    @onclick="() => SelectNode(vertex.Id)">
 
-                    <!-- Círculo del nodo -->
-                    <circle cx="@vertex.PositionX" cy="@vertex.PositionY" r="28"
+                    @if (vertex.Id == _selectedNodeId)
+                    {
+                        <circle cx="@F(vertex.PositionX)" cy="@F(vertex.PositionY)" r="@(NodeRadius + 6)"
+                                fill="none" stroke="#1A56A0" stroke-width="2" stroke-dasharray="4 3" />
+                    }
+
+                    <circle cx="@F(vertex.PositionX)" cy="@F(vertex.PositionY)" r="@NodeRadius"
                             fill="@vertex.StatusColor"
                             stroke="@(vertex.IsSpof ? "#B7791F" : "white")"
                             stroke-width="@(vertex.IsSpof ? 4 : 2)"
                             opacity="0.9" />
 
-                    <!-- Indicador SPOF -->
                     @if (vertex.IsSpof)
                     {
-                        <svg:text x="@(vertex.PositionX + 20)"
-                                  y="@(vertex.PositionY - 20)"
+                        <svg:text x="@F(vertex.PositionX + 20)" y="@F(vertex.PositionY - 20)"
                                   font-size="16" fill="#B7791F">⚠</svg:text>
                     }
 
-                    <!-- Ícono del tipo -->
-                    <svg:text x="@vertex.PositionX" y="@(vertex.PositionY + 4)"
-                              text-anchor="middle" font-size="14"
-                              fill="white">@vertex.TypeIcon</svg:text>
+                    <svg:text x="@F(vertex.PositionX)" y="@F(vertex.PositionY + 4)"
+                              text-anchor="middle" font-size="14" fill="white">@vertex.TypeIcon</svg:text>
 
-                    <!-- Nombre del nodo -->
-                    <svg:text x="@vertex.PositionX" y="@(vertex.PositionY + 44)"
-                              text-anchor="middle" font-size="11"
-                              fill="#2D3748" font-weight="500">
-                        @(vertex.Name.Length > 14
-                            ? vertex.Name[..12] + "…"
-                            : vertex.Name)
-                    </svg:text>
+                    <svg:text class="node-label" x="@F(vertex.PositionX)" y="@F(vertex.PositionY + 44)"
+                              text-anchor="middle" font-size="11" fill="#2D3748" font-weight="500">@ShortName(vertex.Name)</svg:text>
                 </g>
             }
         </svg>
 
-        <!-- Leyenda -->
         <div class="legend">
             <span class="legend-item" style="color:#2F855A">● Operativo</span>
             <span class="legend-item" style="color:#D69E2E">● Degradado</span>
             <span class="legend-item" style="color:#E53E3E">● Fallido</span>
             <span class="legend-item" style="color:#B7791F">⚠ SPOF</span>
+            <span class="legend-item" style="color:#4A5568">Arrastre los nodos para moverlos · A → B: A depende de B</span>
+        </div>
+
+        <!-- IT-1 · HU-02: listado de aristas con eliminación -->
+        <div class="card p-2">
+            <h6 class="mb-2">Dependencias (@GraphService.Graph.EdgeCount)</h6>
+            @if (GraphService.Graph.EdgeCount == 0)
+            {
+                <span class="small text-muted">Aún no hay aristas.</span>
+            }
+            else
+            {
+                <ul id="edge-list" class="list-unstyled mb-0 small" style="max-height:160px; overflow-y:auto;">
+                    @foreach (var edge in GraphService.Graph.Edges)
+                    {
+                        <li class="d-flex justify-content-between align-items-center border-bottom py-1">
+                            <span>@NameOf(edge.SourceId) → @NameOf(edge.TargetId)</span>
+                            <button class="btn btn-sm btn-link text-danger p-0 btn-delete-edge"
+                                    @onclick="() => DeleteEdge(edge.Id)">eliminar</button>
+                        </li>
+                    }
+                </ul>
+            }
         </div>
     </div>
 
     <!-- ── Panel derecho: resultados ──────────────────────────────────── -->
     @if (_showResultsPanel && _lastResult is not null)
     {
-        <div class="results-panel">
+        <div id="results-panel" class="results-panel">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Resultados</h5>
                 <button class="btn btn-sm btn-outline-secondary"
                         @onclick="() => _showResultsPanel = false">✕</button>
             </div>
 
-            <!-- Alertas -->
             @if (_lastResult.IsCriticalImpact)
             {
                 <div class="alert alert-danger">
@@ -172,39 +262,44 @@
                 </div>
             }
 
-            <!-- Métricas -->
             <div class="metrics-grid mb-3">
                 <div class="metric">
-                    <span class="metric-value" style="color:#2F855A">
-                        @GraphService.Graph.OperativeCount
-                    </span>
+                    <span class="metric-value" style="color:#2F855A">@GraphService.Graph.OperativeCount</span>
                     <span class="metric-label">Operativos</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-value" style="color:#D69E2E">
-                        @GraphService.Graph.DegradedCount
-                    </span>
+                    <span class="metric-value" style="color:#D69E2E">@GraphService.Graph.DegradedCount</span>
                     <span class="metric-label">Degradados</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-value" style="color:#E53E3E">
-                        @GraphService.Graph.FailedCount
-                    </span>
+                    <span class="metric-value" style="color:#E53E3E">@GraphService.Graph.FailedCount</span>
                     <span class="metric-label">Fallidos</span>
                 </div>
             </div>
 
-            <!-- Detalle -->
-            <p><strong>Nodos afectados:</strong>
-               @_lastResult.AffectedCount de @GraphService.Graph.NodeCount
-            </p>
-            <p><strong>Tiempo de ejecución:</strong>
-               @_lastResult.ExecutionTimeMs.ToString("F2") ms (WASM)
-            </p>
+            @if (_lastResult.Type == SimulationType.CascadeFailure)
+            {
+                <p><strong>Origen del fallo:</strong> @NameOf(_lastResult.FailureOrigin)</p>
+                <p id="affected-count"><strong>Nodos afectados:</strong>
+                    @_lastResult.AffectedCount de @GraphService.Graph.NodeCount
+                    (@_lastResult.AffectedPercent.ToString("F1")%)
+                </p>
+                @if (_lastResult.AffectedCount > 0)
+                {
+                    <ul id="affected-list">
+                        @foreach (var id in _lastResult.AffectedNodes)
+                        {
+                            <li>@NameOf(id)</li>
+                        }
+                    </ul>
+                }
+            }
+            <p><strong>Tiempo de ejecución:</strong> @_lastResult.ExecutionTimeMs.ToString("F2") ms</p>
+
             @if (_lastResult.SpofList.Count > 0)
             {
                 <p><strong>SPOFs detectados:</strong></p>
-                <ul>
+                <ul id="spof-list">
                     @foreach (var spofId in _lastResult.SpofList)
                     {
                         var spofNode = GraphService.Graph.GetVertex(spofId);
@@ -216,47 +311,143 @@
                 </ul>
             }
 
-            <!-- Botón copiar reporte -->
-            <button class="btn btn-outline-secondary btn-sm w-100 mt-2"
-                    @onclick="CopyReport">
+            <button class="btn btn-outline-secondary btn-sm w-100 mt-2" @onclick="CopyReport">
                 📋 Copiar reporte
             </button>
+            @if (!string.IsNullOrEmpty(_copyMessage))
+            {
+                <div class="small text-muted mt-1">@_copyMessage</div>
+            }
         </div>
     }
 
 </div>
 
 @code {
+    private const int NodeRadius = 28;
+
     // ── Estado del componente ──────────────────────────────────────────────
-    private string    _newNodeName    = string.Empty;
-    private NodeType  _newNodeType    = NodeType.Service;
-    private string    _selectedNodeId = string.Empty;
-    private bool      _showResultsPanel = false;
+    private string   _newNodeName    = string.Empty;
+    private NodeType _newNodeType    = NodeType.Service;
+    private string   _edgeSourceId   = string.Empty;
+    private string   _edgeTargetId   = string.Empty;
+    private string   _edgeMessage    = string.Empty;
+    private bool     _edgeOk;
+    private string   _selectedNodeId = string.Empty;
+    private string   _editName       = string.Empty;
+    private NodeType _editType       = NodeType.Service;
+    private string   _topologyName   = string.Empty;
+    private string   _saveMessage    = string.Empty;
+    private string   _copyMessage    = string.Empty;
+    private bool     _showResultsPanel;
     private SimulationResult? _lastResult;
+
+    // Estado del arrastre (drag & drop)
+    private string? _dragId;
+    private double  _dragStartClientX, _dragStartClientY, _dragStartNodeX, _dragStartNodeY;
+
+    private Vertex? SelectedVertex => GraphService.Graph.GetVertex(_selectedNodeId);
 
     protected override void OnInitialized()
     {
-        GraphService.OnGraphChanged += StateHasChanged;
+        GraphService.OnGraphChanged += HandleGraphChanged;
+        _topologyName = GraphService.Graph.Name;
     }
 
-    // ── Acciones del usuario ───────────────────────────────────────────────
+    private void HandleGraphChanged() => InvokeAsync(StateHasChanged);
+
+    // ── IT-1: nodos y aristas ──────────────────────────────────────────────
 
     private void AddNode()
     {
         if (string.IsNullOrWhiteSpace(_newNodeName)) return;
 
-        // Posición aleatoria dentro del canvas
-        var rnd = new Random();
-        GraphService.AddVertex(_newNodeName, _newNodeType,
-            x: rnd.Next(80, 700), y: rnd.Next(80, 500));
+        // Ubicación en una cuadrícula para no superponer nodos
+        int i = GraphService.Graph.NodeCount;
+        GraphService.AddVertex(_newNodeName.Trim(), _newNodeType,
+            x: 80 + (i % 6) * 110, y: 80 + (i / 6 % 5) * 100);
         _newNodeName = string.Empty;
     }
+
+    private void AddEdge()
+    {
+        var validation = GraphService.ValidateEdge(_edgeSourceId, _edgeTargetId);
+        _edgeOk = validation == EdgeValidation.Valid;
+        _edgeMessage = validation switch
+        {
+            EdgeValidation.Valid         => $"Dependencia creada: {NameOf(_edgeSourceId)} → {NameOf(_edgeTargetId)}",
+            EdgeValidation.MissingVertex => "Seleccione un nodo de origen y uno de destino.",
+            EdgeValidation.SelfLoop      => "Un nodo no puede depender de sí mismo.",
+            EdgeValidation.Duplicate     => "Esa dependencia ya existe.",
+            _                            => string.Empty
+        };
+        if (_edgeOk)
+            GraphService.AddEdge(_edgeSourceId, _edgeTargetId);
+    }
+
+    private void DeleteEdge(string edgeId) => GraphService.RemoveEdge(edgeId);
 
     private void SelectNode(string id)
     {
         _selectedNodeId = id;
-        StateHasChanged();
+        OnSelectionChanged();
     }
+
+    private void OnSelectionChanged()
+    {
+        var v = SelectedVertex;
+        if (v is null) return;
+        _editName = v.Name;
+        _editType = v.NodeType;
+    }
+
+    private void SaveNodeChanges()
+    {
+        if (SelectedVertex is null || string.IsNullOrWhiteSpace(_editName)) return;
+        GraphService.UpdateVertex(_selectedNodeId, _editName.Trim(), _editType);
+    }
+
+    private void DeleteSelectedNode()
+    {
+        if (SelectedVertex is null) return;
+        GraphService.RemoveVertex(_selectedNodeId);
+        _selectedNodeId = string.Empty;
+        _lastResult = null;
+        _showResultsPanel = false;
+    }
+
+    // ── IT-2: arrastre de nodos y persistencia ─────────────────────────────
+
+    private void StartDrag(PointerEventArgs e, string vertexId)
+    {
+        var v = GraphService.Graph.GetVertex(vertexId);
+        if (v is null) return;
+        _dragId = vertexId;
+        _dragStartClientX = e.ClientX;
+        _dragStartClientY = e.ClientY;
+        _dragStartNodeX = v.PositionX;
+        _dragStartNodeY = v.PositionY;
+    }
+
+    private void OnPointerMove(PointerEventArgs e)
+    {
+        if (_dragId is null) return;
+        var x = Math.Max(NodeRadius, _dragStartNodeX + (e.ClientX - _dragStartClientX));
+        var y = Math.Clamp(_dragStartNodeY + (e.ClientY - _dragStartClientY), NodeRadius, 600 - NodeRadius);
+        GraphService.UpdateVertexPosition(_dragId, x, y);
+    }
+
+    private void EndDrag() => _dragId = null;
+
+    private async Task SaveTopology()
+    {
+        if (!string.IsNullOrWhiteSpace(_topologyName))
+            GraphService.Graph.Name = _topologyName.Trim();
+        await StorageService.SaveTopologyAsync(GraphService.Graph);
+        _saveMessage = $"Topología «{GraphService.Graph.Name}» guardada ({GraphService.Graph.NodeCount} nodos, {GraphService.Graph.EdgeCount} aristas).";
+    }
+
+    // ── IT-3: simulación de cascada ────────────────────────────────────────
 
     private void RunCascadeSimulation()
     {
@@ -270,7 +461,7 @@
         var spofs = SpofService.DetectSpofs();
         _lastResult = new SimulationResult
         {
-            Type    = SimulationType.SpofAnalysis,
+            Type     = SimulationType.SpofAnalysis,
             SpofList = spofs.Select(v => v.Id).ToList()
         };
         _showResultsPanel = true;
@@ -281,31 +472,62 @@
         GraphService.ResetSimulation();
         _lastResult       = null;
         _showResultsPanel = false;
-        _selectedNodeId   = string.Empty;
     }
 
     private void ClearGraph()
     {
         GraphService.ClearGraph();
+        _selectedNodeId = _edgeSourceId = _edgeTargetId = _edgeMessage = _saveMessage = string.Empty;
+        _topologyName = GraphService.Graph.Name;
         ResetSimulation();
     }
 
     private void LoadPredefined(int index)
     {
         GraphService.LoadPredefinedTopology(index);
+        _selectedNodeId = _edgeSourceId = _edgeTargetId = _edgeMessage = _saveMessage = string.Empty;
+        _topologyName = GraphService.Graph.Name;
         ResetSimulation();
     }
 
-    private void CopyReport()
+    private async Task CopyReport()
     {
-        // Implementación via JS Interop en versión completa
-        // Por ahora muestra el resumen en consola
-        if (_lastResult is not null)
-            Console.WriteLine(_lastResult.GenerateSummary());
+        if (_lastResult is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _lastResult.GenerateSummary());
+            _copyMessage = "Reporte copiado al portapapeles.";
+        }
+        catch (JSException)
+        {
+            _copyMessage = "No se pudo acceder al portapapeles del navegador.";
+        }
+    }
+
+    // ── Utilidades de presentación ─────────────────────────────────────────
+
+    private string NameOf(string vertexId) => GraphService.Graph.GetVertex(vertexId)?.Name ?? "—";
+
+    private static string ShortName(string name) => name.Length > 14 ? name[..12] + "…" : name;
+
+    /// <summary>Formatea coordenadas con punto decimal para SVG, sin depender de la cultura.</summary>
+    private static string F(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Recorta el segmento entre dos nodos para que empiece y termine en el borde
+    /// de los círculos, de modo que la punta de flecha quede visible.
+    /// </summary>
+    private static (double, double, double, double) TrimToRadius(Vertex a, Vertex b, double r)
+    {
+        double dx = b.PositionX - a.PositionX, dy = b.PositionY - a.PositionY;
+        double len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 2 * r) return (a.PositionX, a.PositionY, b.PositionX, b.PositionY);
+        double ux = dx / len, uy = dy / len;
+        return (a.PositionX + ux * r, a.PositionY + uy * r, b.PositionX - ux * r, b.PositionY - uy * r);
     }
 
     public void Dispose()
     {
-        GraphService.OnGraphChanged -= StateHasChanged;
+        GraphService.OnGraphChanged -= HandleGraphChanged;
     }
 }

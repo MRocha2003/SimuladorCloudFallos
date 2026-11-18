@@ -69,15 +69,35 @@ public class GraphModel
         Edges.Any(e => e.SourceId == sourceId && e.TargetId == targetId);
 
     /// <summary>
-    /// Obtiene todas las aristas que salen de un nodo (aristas de dependencia).
+    /// Obtiene las aristas activas que salen de un nodo: e(vertexId, v),
+    /// es decir, los componentes de los que el nodo depende.
     /// </summary>
     public IEnumerable<Edge> GetOutgoingEdges(string vertexId) =>
         Edges.Where(e => e.SourceId == vertexId && e.IsActive);
 
     /// <summary>
-    /// Obtiene todos los nodos que dependen del nodo dado (vecinos de salida).
+    /// Obtiene las aristas activas que llegan a un nodo: e(u, vertexId),
+    /// es decir, las dependencias de otros componentes hacia este nodo.
+    /// Son las aristas por las que se propaga un fallo del nodo (IT-3).
+    /// </summary>
+    public IEnumerable<Edge> GetIncomingEdges(string vertexId) =>
+        Edges.Where(e => e.TargetId == vertexId && e.IsActive);
+
+    /// <summary>
+    /// Obtiene los nodos que dependen del nodo dado (orígenes de sus aristas
+    /// entrantes). Si el nodo falla, estos nodos pueden verse afectados.
     /// </summary>
     public IEnumerable<Vertex> GetDependents(string vertexId) =>
+        GetIncomingEdges(vertexId)
+            .Select(e => GetVertex(e.SourceId))
+            .Where(v => v is not null)
+            .Cast<Vertex>();
+
+    /// <summary>
+    /// Obtiene los nodos de los que depende el nodo dado (destinos de sus
+    /// aristas salientes).
+    /// </summary>
+    public IEnumerable<Vertex> GetDependencies(string vertexId) =>
         GetOutgoingEdges(vertexId)
             .Select(e => GetVertex(e.TargetId))
             .Where(v => v is not null)

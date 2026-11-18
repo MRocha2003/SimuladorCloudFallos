@@ -102,23 +102,32 @@ public class GraphService
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// Valida si se puede crear la arista dirigida e(sourceId, targetId).
+    /// HU-02 — Criterios de aceptación 4 y 5 (sin duplicados y grafo válido).
+    /// </summary>
+    public EdgeValidation ValidateEdge(string sourceId, string targetId)
+    {
+        if (string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(targetId) ||
+            _graph.GetVertex(sourceId) is null || _graph.GetVertex(targetId) is null)
+            return EdgeValidation.MissingVertex;
+
+        if (sourceId == targetId)
+            return EdgeValidation.SelfLoop;
+
+        if (_graph.EdgeExists(sourceId, targetId))
+            return EdgeValidation.Duplicate;
+
+        return EdgeValidation.Valid;
+    }
+
+    /// <summary>
     /// Agrega una arista dirigida e(sourceId, targetId) al grafo G=(V,E).
     /// HU-02 — Criterios de aceptación 1, 4.
     /// </summary>
-    /// <returns>La arista creada, o null si algún nodo no existe o ya existe la arista.</returns>
+    /// <returns>La arista creada, o null si la validación falla.</returns>
     public Edge? AddEdge(string sourceId, string targetId, double weight = 1.0)
     {
-        // Validar que ambos nodos existen
-        if (_graph.GetVertex(sourceId) is null ||
-            _graph.GetVertex(targetId) is null)
-            return null;
-
-        // Prevenir aristas duplicadas (HU-02 — Criterio 4)
-        if (_graph.EdgeExists(sourceId, targetId))
-            return null;
-
-        // Prevenir auto-bucles
-        if (sourceId == targetId)
+        if (ValidateEdge(sourceId, targetId) != EdgeValidation.Valid)
             return null;
 
         var edge = new Edge
