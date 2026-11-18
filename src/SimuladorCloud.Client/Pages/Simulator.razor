@@ -5,12 +5,15 @@
 @inject CascadeSimulationService CascadeService
 @inject SpofDetectionService SpofService
 @inject TopologyStorageService StorageService
+@inject CriticalPathService CriticalPathService
+@inject ReportService ReportService
+@inject AlertService AlertService
 @inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Simulador Cloud — Gestión Preventiva de Riesgos</PageTitle>
 
-<div class="simulator-layout">
+<div class="simulator-layout @(_lastResult is not null && _panelCollapsed ? "panel-collapsed" : "")">
 
     <!-- ── Panel izquierdo: controles ─────────────────────────────────── -->
     <div class="control-panel">
@@ -67,6 +70,23 @@
         {
             <div id="selected-node-card" class="card mb-3">
                 <h5>Nodo seleccionado</h5>
+                @if (SelectedVertex.IsSpof && _spofImpacts.FirstOrDefault(i => i.VertexId == SelectedVertex.Id) is { } impact)
+                {
+                    <!-- IT-4 · HU-08: información de impacto del SPOF -->
+                    <div id="spof-impact" class="spof-impact mb-2">
+                        <strong>⚠ SPOF</strong>
+                        @if (impact.DisconnectedNodes.Count > 0)
+                        {
+                            <div>Su caída desconectaría @impact.DisconnectedNodes.Count nodo(s):
+                                @string.Join(", ", impact.DisconnectedNodes.Select(NameOf)).</div>
+                        }
+                        else
+                        {
+                            <div>Su caída dividiría la arquitectura en @impact.ComponentsAfterRemoval partes.</div>
+                        }
+                        <div>Si falla, la cascada afectaría a @impact.CascadeAffected.Count nodo(s)@(impact.CascadeAffected.Count > 0 ? ": " + string.Join(", ", impact.CascadeAffected.Select(NameOf)) : "").</div>
+                    </div>
+                }
                 <input id="edit-node-name" class="form-control mb-2" @bind="_editName" />
                 <select id="edit-node-type" class="form-control mb-2" @bind="_editType">
                     @foreach (NodeType type in Enum.GetValues<NodeType>())
@@ -99,7 +119,7 @@
                 ▶ Simular cascada
             </button>
             <button id="btn-spof" class="btn btn-warning w-100 mb-2" @onclick="DetectSpofs">
-                🔍 Detectar SPOFs
+                🔍 Detectar SPOFs y rutas críticas
             </button>
             <button id="btn-reset" class="btn btn-secondary w-100" @onclick="ResetSimulation">
                 ↺ Reiniciar
@@ -127,9 +147,18 @@
                     @onclick="() => LoadPredefined(0)">
                 Pequeña (8 nodos)
             </button>
-            <button id="btn-load-medium" class="btn btn-outline-primary w-100"
+            <button id="btn-load-medium" class="btn btn-outline-primary w-100 mb-2"
                     @onclick="() => LoadPredefined(1)">
                 Mediana (20 nodos)
+            </button>
+            <!-- IT-6 · HU-11: escenarios grande y complejo -->
+            <button id="btn-load-large" class="btn btn-outline-primary w-100 mb-2"
+                    @onclick="() => LoadPredefined(2)">
+                Grande (50 nodos)
+            </button>
+            <button id="btn-load-complex" class="btn btn-outline-primary w-100"
+                    @onclick="() => LoadPredefined(3)">
+                Compleja (100 nodos)
             </button>
         </div>
 
@@ -140,8 +169,31 @@
 
     <!-- ── Canvas SVG: visualización interactiva del grafo (IT-2 · HU-03) ── -->
     <div class="canvas-container">
-        <svg id="graph-canvas" width="100%" height="600"
-             style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; user-select:none; touch-action:none;"
+
+        <!-- IT-6 · HU-12: alertas visuales no bloqueantes y descartables -->
+        @if (_alerts.Count > 0)
+        {
+            <div id="alert-stack" class="alert-stack">
+                @if (_alerts.Count > 1)
+                {
+                    <button id="btn-dismiss-all" class="btn-dismiss-all" @onclick="DismissAllAlerts">Descartar todas (@_alerts.Count)</button>
+                }
+                @foreach (var alert in _alerts)
+                {
+                    <div @key="alert.Id" class="visual-alert visual-alert-@alert.Level.ToString().ToLowerInvariant()" role="status">
+                        <div class="visual-alert-body">
+                            <strong>@alert.Title</strong>
+                            <div>@alert.Message</div>
+                        </div>
+                        <button class="btn-dismiss-alert" title="Descartar" @onclick="() => DismissAlert(alert.Id)">✕</button>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="canvas-scroll">
+        <svg id="graph-canvas" width="@F(CanvasWidth)" height="@F(CanvasHeight)"
+             style="min-width:100%; background:#F8FAFC; user-select:none; touch-action:none; display:block;"
              @onpointermove="OnPointerMove"
              @onpointerup="EndDrag"
              @onpointerleave="EndDrag">
@@ -155,6 +207,10 @@
                         refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                     <path d="M0,0 L0,6 L9,3 z" fill="#E53E3E" />
                 </marker>
+                <marker id="arrow-purple" markerWidth="10" markerHeight="10"
+                        refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#805AD5" />
+                </marker>
             </defs>
 
             <!-- Aristas: se recortan al borde del círculo para que la flecha sea visible -->
@@ -165,11 +221,11 @@
                 if (src is not null && tgt is not null)
                 {
                     var (x1, y1, x2, y2) = TrimToRadius(src, tgt, NodeRadius + 2);
-                    <line class="graph-edge" data-edge-id="@edge.Id"
+                    <line class="graph-edge@(edge.IsCriticalPath ? " critical-edge" : "")" data-edge-id="@edge.Id"
                           x1="@F(x1)" y1="@F(y1)" x2="@F(x2)" y2="@F(y2)"
                           stroke="@edge.StrokeColor"
                           stroke-width="@edge.StrokeWidth"
-                          marker-end="@(edge.IsCascadePath ? "url(#arrow-red)" : "url(#arrow)")" />
+                          marker-end="url(#@edge.MarkerId)" />
                 }
             }
 
@@ -195,6 +251,9 @@
 
                     @if (vertex.IsSpof)
                     {
+                        <!-- IT-4 · HU-08: marcador diferenciado de SPOF -->
+                        <circle class="spof-marker" cx="@F(vertex.PositionX)" cy="@F(vertex.PositionY)" r="@(NodeRadius + 10)"
+                                fill="none" stroke="#B7791F" stroke-width="2.5" stroke-dasharray="6 4" />
                         <svg:text x="@F(vertex.PositionX + 20)" y="@F(vertex.PositionY - 20)"
                                   font-size="16" fill="#B7791F">⚠</svg:text>
                     }
@@ -207,12 +266,16 @@
                 </g>
             }
         </svg>
+        </div>
 
-        <div class="legend">
+        <!-- IT-4 · HU-08: leyenda de marcadores -->
+        <div id="legend" class="legend">
             <span class="legend-item" style="color:#2F855A">● Operativo</span>
             <span class="legend-item" style="color:#D69E2E">● Degradado</span>
             <span class="legend-item" style="color:#E53E3E">● Fallido</span>
-            <span class="legend-item" style="color:#B7791F">⚠ SPOF</span>
+            <span class="legend-item" style="color:#E53E3E">→ Propagación de la cascada</span>
+            <span class="legend-item" style="color:#805AD5">▬ Ruta crítica</span>
+            <span class="legend-item" style="color:#B7791F">⚠ SPOF (clic para ver su impacto)</span>
             <span class="legend-item" style="color:#4A5568">Arrastre los nodos para moverlos · A → B: A depende de B</span>
         </div>
 
@@ -239,86 +302,114 @@
         </div>
     </div>
 
-    <!-- ── Panel derecho: resultados ──────────────────────────────────── -->
-    @if (_showResultsPanel && _lastResult is not null)
+    <!-- ── Panel derecho: resultados (IT-5 · HU-09/HU-10) ───────────────── -->
+    @if (_lastResult is not null && _report is not null)
     {
-        <div id="results-panel" class="results-panel">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Resultados</h5>
-                <button class="btn btn-sm btn-outline-secondary"
-                        @onclick="() => _showResultsPanel = false">✕</button>
+        @if (_panelCollapsed)
+        {
+            <div id="results-panel" class="results-panel collapsed">
+                <button id="btn-toggle-panel" class="btn btn-sm btn-outline-secondary w-100"
+                        title="Expandir el panel" @onclick="TogglePanel">◂ Resultados</button>
             </div>
+        }
+        else
+        {
+            <div id="results-panel" class="results-panel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Resultados</h5>
+                    <button id="btn-toggle-panel" class="btn btn-sm btn-outline-secondary"
+                            title="Colapsar el panel" @onclick="TogglePanel">▸</button>
+                </div>
 
-            @if (_lastResult.IsCriticalImpact)
-            {
-                <div class="alert alert-danger">
-                    ⚠ Impacto crítico: @_lastResult.AffectedPercent.ToString("F1")% del sistema afectado
-                </div>
-            }
-            @if (_lastResult.HasSpofs)
-            {
-                <div class="alert alert-warning">
-                    ⚠ @_lastResult.SpofList.Count SPOF(s) detectado(s)
-                </div>
-            }
-
-            <div class="metrics-grid mb-3">
-                <div class="metric">
-                    <span class="metric-value" style="color:#2F855A">@GraphService.Graph.OperativeCount</span>
-                    <span class="metric-label">Operativos</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-value" style="color:#D69E2E">@GraphService.Graph.DegradedCount</span>
-                    <span class="metric-label">Degradados</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-value" style="color:#E53E3E">@GraphService.Graph.FailedCount</span>
-                    <span class="metric-label">Fallidos</span>
-                </div>
-            </div>
-
-            @if (_lastResult.Type == SimulationType.CascadeFailure)
-            {
-                <p><strong>Origen del fallo:</strong> @NameOf(_lastResult.FailureOrigin)</p>
-                <p id="affected-count"><strong>Nodos afectados:</strong>
-                    @_lastResult.AffectedCount de @GraphService.Graph.NodeCount
-                    (@_lastResult.AffectedPercent.ToString("F1")%)
-                </p>
-                @if (_lastResult.AffectedCount > 0)
+                @if (_lastResult.IsCriticalImpact)
                 {
-                    <ul id="affected-list">
-                        @foreach (var id in _lastResult.AffectedNodes)
+                    <div class="alert alert-danger py-2">
+                        ⚠ Impacto crítico: @_lastResult.AffectedPercent.ToString("F1")% del sistema afectado
+                    </div>
+                }
+
+                <div class="metrics-grid mb-3">
+                    <div class="metric">
+                        <span id="count-operative" class="metric-value" style="color:#2F855A">@GraphService.Graph.OperativeCount</span>
+                        <span class="metric-label">Operativos</span>
+                    </div>
+                    <div class="metric">
+                        <span id="count-degraded" class="metric-value" style="color:#D69E2E">@GraphService.Graph.DegradedCount</span>
+                        <span class="metric-label">Degradados</span>
+                    </div>
+                    <div class="metric">
+                        <span id="count-failed" class="metric-value" style="color:#E53E3E">@GraphService.Graph.FailedCount</span>
+                        <span class="metric-label">Fallidos</span>
+                    </div>
+                </div>
+
+                @if (_lastResult.Type == SimulationType.CascadeFailure)
+                {
+                    <p class="mb-1"><strong>Origen del fallo:</strong> @NameOf(_lastResult.FailureOrigin)</p>
+                    <p id="affected-count" class="mb-1"><strong>Nodos afectados:</strong>
+                        @_lastResult.AffectedCount de @GraphService.Graph.NodeCount
+                        (@_lastResult.AffectedPercent.ToString("F1")%)
+                    </p>
+                    @if (_lastResult.AffectedCount > 0)
+                    {
+                        <ul id="affected-list" class="small">
+                            @foreach (var id in _lastResult.AffectedNodes)
+                            {
+                                <li>@NameOf(id)</li>
+                            }
+                        </ul>
+                    }
+                    <p class="small"><strong>Tiempo de ejecución:</strong> @_lastResult.ExecutionTimeMs.ToString("F2") ms</p>
+                }
+
+                <h6 class="mt-2">SPOFs (@_spofImpacts.Count)</h6>
+                @if (_spofImpacts.Count == 0)
+                {
+                    <p class="small text-muted">No se detectaron puntos únicos de fallo.</p>
+                }
+                else
+                {
+                    <ul id="spof-list" class="small">
+                        @foreach (var impact in _spofImpacts)
                         {
-                            <li>@NameOf(id)</li>
+                            <li>
+                                <a href="javascript:void(0)" @onclick="() => SelectNode(impact.VertexId)">@impact.VertexName</a>
+                                (@impact.NodeType) — impacto: @impact.CriticalityScore nodo(s)
+                            </li>
                         }
                     </ul>
                 }
-            }
-            <p><strong>Tiempo de ejecución:</strong> @_lastResult.ExecutionTimeMs.ToString("F2") ms</p>
 
-            @if (_lastResult.SpofList.Count > 0)
-            {
-                <p><strong>SPOFs detectados:</strong></p>
-                <ul id="spof-list">
-                    @foreach (var spofId in _lastResult.SpofList)
-                    {
-                        var spofNode = GraphService.Graph.GetVertex(spofId);
-                        if (spofNode is not null)
+                <h6 class="mt-2">Rutas críticas (@_criticalPaths.Count)</h6>
+                @if (_criticalPaths.Count == 0)
+                {
+                    <p class="small text-muted">No hay cadenas de dependencias.</p>
+                }
+                else
+                {
+                    <ol id="critical-paths" class="small">
+                        @foreach (var path in _criticalPaths)
                         {
-                            <li>@spofNode.Name (@spofNode.NodeType)</li>
+                            <li>@string.Join(" → ", path.NodeIds.Select(NameOf))
+                                <span class="text-muted">(longitud @path.Length@(path.SpofCount > 0 ? $", {path.SpofCount} SPOF" : ""))</span></li>
                         }
-                    }
-                </ul>
-            }
+                    </ol>
+                }
 
-            <button class="btn btn-outline-secondary btn-sm w-100 mt-2" @onclick="CopyReport">
-                📋 Copiar reporte
-            </button>
-            @if (!string.IsNullOrEmpty(_copyMessage))
-            {
-                <div class="small text-muted mt-1">@_copyMessage</div>
-            }
-        </div>
+                <details id="impact-report-box" class="mt-2">
+                    <summary class="small">Ver reporte de impacto</summary>
+                    <pre id="impact-report" class="report-text">@_report.ToText()</pre>
+                </details>
+
+                <button class="btn btn-outline-secondary btn-sm w-100 mt-2" @onclick="CopyReport">
+                    📋 Copiar reporte
+                </button>
+                @if (!string.IsNullOrEmpty(_copyMessage))
+                {
+                    <div class="small text-muted mt-1">@_copyMessage</div>
+                }
+            </div>
+        }
     }
 
 </div>
@@ -339,8 +430,12 @@
     private string   _topologyName   = string.Empty;
     private string   _saveMessage    = string.Empty;
     private string   _copyMessage    = string.Empty;
-    private bool     _showResultsPanel;
+    private bool     _panelCollapsed;
     private SimulationResult? _lastResult;
+    private ImpactReport?     _report;
+    private List<SpofImpact>   _spofImpacts   = new();
+    private List<CriticalPath> _criticalPaths = new();
+    private List<VisualAlert>  _alerts        = new();
 
     // Estado del arrastre (drag & drop)
     private string? _dragId;
@@ -412,8 +507,7 @@
         if (SelectedVertex is null) return;
         GraphService.RemoveVertex(_selectedNodeId);
         _selectedNodeId = string.Empty;
-        _lastResult = null;
-        _showResultsPanel = false;
+        ClearResults();
     }
 
     // ── IT-2: arrastre de nodos y persistencia ─────────────────────────────
@@ -433,7 +527,7 @@
     {
         if (_dragId is null) return;
         var x = Math.Max(NodeRadius, _dragStartNodeX + (e.ClientX - _dragStartClientX));
-        var y = Math.Clamp(_dragStartNodeY + (e.ClientY - _dragStartClientY), NodeRadius, 600 - NodeRadius);
+        var y = Math.Clamp(_dragStartNodeY + (e.ClientY - _dragStartClientY), NodeRadius, CanvasHeight - NodeRadius);
         GraphService.UpdateVertexPosition(_dragId, x, y);
     }
 
@@ -447,31 +541,64 @@
         _saveMessage = $"Topología «{GraphService.Graph.Name}» guardada ({GraphService.Graph.NodeCount} nodos, {GraphService.Graph.EdgeCount} aristas).";
     }
 
-    // ── IT-3: simulación de cascada ────────────────────────────────────────
+    // ── IT-3 a IT-6: simulación, análisis, reporte y alertas ──────────────
 
+    /// <summary>
+    /// Simula la cascada desde el nodo seleccionado y, a continuación, analiza
+    /// SPOFs y rutas críticas para generar el reporte completo (HU-09) y las
+    /// alertas (HU-12).
+    /// </summary>
     private void RunCascadeSimulation()
     {
         if (string.IsNullOrEmpty(_selectedNodeId)) return;
-        _lastResult       = CascadeService.SimulateCascade(_selectedNodeId);
-        _showResultsPanel = true;
+        var result = CascadeService.SimulateCascade(_selectedNodeId);
+        Analyze(result);
     }
 
+    /// <summary>Análisis de SPOFs y rutas críticas sin inyectar fallos (HU-07, HU-08).</summary>
     private void DetectSpofs()
     {
-        var spofs = SpofService.DetectSpofs();
-        _lastResult = new SimulationResult
-        {
-            Type     = SimulationType.SpofAnalysis,
-            SpofList = spofs.Select(v => v.Id).ToList()
-        };
-        _showResultsPanel = true;
+        GraphService.ResetSimulation();
+        Analyze(new SimulationResult { Type = SimulationType.SpofAnalysis });
+    }
+
+    private void Analyze(SimulationResult result)
+    {
+        SpofService.DetectSpofs();
+        _spofImpacts   = SpofService.AnalyzeAllImpacts();
+        _criticalPaths = CriticalPathService.FindCriticalPaths();
+
+        result.SpofList      = _spofImpacts.Select(i => i.VertexId).ToList();
+        result.CriticalPaths = _criticalPaths.Select(p => p.NodeIds.ToList()).ToList();
+
+        _lastResult = result;
+        _report     = ReportService.BuildReport(result, _spofImpacts, _criticalPaths);
+        _report.ExecutionTimeMs = result.ExecutionTimeMs + SpofService.LastExecutionTimeMs + CriticalPathService.LastExecutionTimeMs;
+        _alerts         = AlertService.BuildAlerts(result, _spofImpacts);
+        _panelCollapsed = false;
+        _copyMessage    = string.Empty;
+    }
+
+    private void TogglePanel() => _panelCollapsed = !_panelCollapsed;
+
+    private void DismissAlert(string alertId) => _alerts.RemoveAll(a => a.Id == alertId);
+
+    private void DismissAllAlerts() => _alerts.Clear();
+
+    private void ClearResults()
+    {
+        _lastResult    = null;
+        _report        = null;
+        _spofImpacts   = new();
+        _criticalPaths = new();
+        _alerts        = new();
+        _copyMessage   = string.Empty;
     }
 
     private void ResetSimulation()
     {
         GraphService.ResetSimulation();
-        _lastResult       = null;
-        _showResultsPanel = false;
+        ClearResults();
     }
 
     private void ClearGraph()
@@ -492,10 +619,10 @@
 
     private async Task CopyReport()
     {
-        if (_lastResult is null) return;
+        if (_report is null) return;
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _lastResult.GenerateSummary());
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _report.ToText());
             _copyMessage = "Reporte copiado al portapapeles.";
         }
         catch (JSException)
@@ -507,6 +634,12 @@
     // ── Utilidades de presentación ─────────────────────────────────────────
 
     private string NameOf(string vertexId) => GraphService.Graph.GetVertex(vertexId)?.Name ?? "—";
+
+    /// <summary>Ancho del canvas: se amplía para que quepan topologías grandes (HU-11).</summary>
+    private double CanvasWidth => Math.Max(800, GraphService.Graph.Vertices.Select(v => v.PositionX).DefaultIfEmpty(0).Max() + 80);
+
+    /// <summary>Alto del canvas: se amplía para que quepan topologías grandes (HU-11).</summary>
+    private double CanvasHeight => Math.Max(600, GraphService.Graph.Vertices.Select(v => v.PositionY).DefaultIfEmpty(0).Max() + 80);
 
     private static string ShortName(string name) => name.Length > 14 ? name[..12] + "…" : name;
 

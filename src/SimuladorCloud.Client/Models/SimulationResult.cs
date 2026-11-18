@@ -43,8 +43,11 @@ public class SimulationResult
 
     // ── Propiedades de conveniencia ────────────────────────────────────────────
 
-    /// <summary>Indica si la cascada afecta a más del 50% del sistema.</summary>
-    public bool IsCriticalImpact => AffectedPercent >= 50.0;
+    /// <summary>Umbral de impacto crítico: porcentaje de nodos afectados.</summary>
+    public const double CriticalImpactThreshold = 50.0;
+
+    /// <summary>Indica si la cascada afecta a más del 50% del sistema (HU-12).</summary>
+    public bool IsCriticalImpact => AffectedPercent > CriticalImpactThreshold;
 
     /// <summary>Indica si se detectaron SPOFs en el análisis.</summary>
     public bool HasSpofs => SpofList.Count > 0;

@@ -20,8 +20,13 @@ builder.Services.AddSingleton<GraphService>();
 // Motor de simulación de cascadas BFS/DFS (RF-04, RF-05, RF-12)
 builder.Services.AddSingleton<CascadeSimulationService>();
 
-// Detección de SPOFs mediante algoritmo de Tarjan (RF-06)
+// Detección de SPOFs mediante algoritmo de Tarjan (RF-06) — IT-4
 builder.Services.AddSingleton<SpofDetectionService>();
+
+// Rutas críticas (IT-4), reporte de impacto (IT-5) y alertas visuales (IT-6)
+builder.Services.AddSingleton<CriticalPathService>();
+builder.Services.AddSingleton<ReportService>();
+builder.Services.AddSingleton<AlertService>();
 
 // Persistencia de topologías y resultados (RF-10, RF-11)
 builder.Services.AddScoped<TopologyStorageService>();

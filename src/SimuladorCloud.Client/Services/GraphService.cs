@@ -7,7 +7,7 @@ namespace SimuladorCloud.Client.Services;
 /// Implementa el CRUD de nodos y aristas (HU-01, HU-02).
 /// Opera íntegramente en memoria — sin conexión a nubes reales (RF-12).
 /// </summary>
-public class GraphService
+public partial class GraphService
 {
     private GraphModel _graph = new();
 
@@ -193,8 +193,9 @@ public class GraphService
     }
 
     /// <summary>
-    /// Carga una de las topologías predefinidas para pruebas.
-    /// HU-13 — Escenarios de prueba predefinidos.
+    /// Carga una de las topologías predefinidas para pruebas:
+    /// 0 = pequeña (8 nodos), 1 = mediana (20), 2 = grande (50), 3 = compleja (100).
+    /// HU-11 — Escenarios de prueba predefinidos.
     /// </summary>
     public void LoadPredefinedTopology(int scenarioIndex)
     {
@@ -202,6 +203,8 @@ public class GraphService
         {
             0 => CreateSmallTopology(),
             1 => CreateMediumTopology(),
+            2 => CreateLargeTopology(),
+            3 => CreateComplexTopology(),
             _ => CreateSmallTopology()
         };
         NotifyChange();

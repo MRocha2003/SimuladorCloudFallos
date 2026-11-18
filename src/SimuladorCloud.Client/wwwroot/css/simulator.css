@@ -7,6 +7,11 @@
     min-height: calc(100vh - 60px);
 }
 
+/* Panel de resultados colapsado: el canvas gana espacio (IT-5 · HU-10) */
+.simulator-layout.panel-collapsed {
+    grid-template-columns: 260px 1fr 130px;
+}
+
 /* ── Panel de controles izquierdo ──────────────────────────────────────────── */
 .control-panel {
     background: #F8FAFC;
@@ -44,12 +49,84 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    position: relative;
+    min-width: 0;
+}
+
+/* Contenedor desplazable: las topologías de 50 y 100 nodos superan el área visible (IT-6) */
+.canvas-scroll {
+    overflow: auto;
+    max-height: 640px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background: #F8FAFC;
+}
+
+/* ── Alertas visuales no bloqueantes (IT-6 · HU-12) ────────────────────────── */
+.alert-stack {
+    position: absolute;
+    top: 10px;
+    right: 22px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 340px;
+    pointer-events: none;          /* el canvas sigue siendo utilizable */
+}
+
+.visual-alert {
+    pointer-events: auto;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    background: white;
+    border-left: 4px solid #B7791F;
+}
+
+.visual-alert-danger  { border-left-color: #E53E3E; }
+.visual-alert-warning { border-left-color: #B7791F; }
+.visual-alert-body    { flex: 1; }
+
+.btn-dismiss-all {
+    pointer-events: auto;
+    align-self: flex-end;
+    border: 1px solid #CBD5E1;
+    background: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    color: #4A5568;
+    cursor: pointer;
+}
+
+.btn-dismiss-alert {
+    border: none;
+    background: transparent;
+    color: #718096;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+/* ── Información de impacto de un SPOF (IT-4 · HU-08) ─────────────────────── */
+.spof-impact {
+    background: #FFFBEB;
+    border: 1px solid #F6E05E;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 0.8rem;
 }
 
 /* ── Leyenda del canvas ────────────────────────────────────────────────────── */
 .legend {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 6px 16px;
     justify-content: center;
     padding: 8px;
     background: white;
@@ -69,6 +146,27 @@
     border-radius: 8px;
     padding: 16px;
     height: fit-content;
+}
+
+.results-panel.collapsed {
+    padding: 8px;
+}
+
+.results-panel h6 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4A5568;
+}
+
+.report-text {
+    white-space: pre-wrap;
+    font-size: 0.72rem;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 8px;
+    max-height: 260px;
+    overflow-y: auto;
 }
 
 .results-panel h5 {
