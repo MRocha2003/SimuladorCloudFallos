@@ -208,3 +208,31 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Confirmación de limpieza (IT-7 · HU-14) ───────────────────────────────── */
+.clear-confirm {
+    border: 1px solid #FEB2B2;
+    background: #FFF5F5;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+/* ── Página de validación (IT-7 · HU-13) ──────────────────────────────────── */
+.validation-page {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.validation-table th {
+    font-size: 0.8rem;
+    color: #4A5568;
+    white-space: nowrap;
+}
+
+.validation-table td {
+    font-size: 0.85rem;
+}

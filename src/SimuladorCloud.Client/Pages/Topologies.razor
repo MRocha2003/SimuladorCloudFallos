@@ -11,7 +11,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 style="color:#1A56A0;">📂 Topologías Guardadas</h2>
-        <a href="/simulator" class="btn btn-primary">+ Nueva Topología</a>
+        <a href="simulator" class="btn btn-primary">+ Nueva Topología</a>
     </div>
 
     @if (_loading)
@@ -28,7 +28,7 @@
             <p style="color:#718096; font-size:0.875rem;">
                 Ve al simulador, construye una topología y guárdala para verla aquí.
             </p>
-            <a href="/simulator" class="btn btn-primary mt-2">Ir al Simulador</a>
+            <a href="simulator" class="btn btn-primary mt-2">Ir al Simulador</a>
         </div>
     }
     else
@@ -82,7 +82,7 @@
         var topo = await StorageService.LoadTopologyAsync(id);
         if (topo is null) return;
         GraphService.LoadGraph(topo);
-        Nav.NavigateTo("/simulator");
+        Nav.NavigateTo("simulator");
     }
 
     private async Task DeleteTopology(string id)

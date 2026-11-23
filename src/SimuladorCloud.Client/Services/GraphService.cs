@@ -65,7 +65,7 @@ public partial class GraphService
     }
 
     /// <summary>
-    /// Actualiza la posición de un nodo en el canvas SVG (drag & drop).
+    /// Actualiza la posición de un nodo en el canvas SVG (arrastrar y soltar).
     /// HU-04 — Criterio de aceptación 2.
     /// </summary>
     public bool UpdateVertexPosition(string id, double x, double y)

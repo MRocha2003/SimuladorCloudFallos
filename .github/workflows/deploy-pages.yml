@@ -1,0 +1,57 @@
+# Publica el simulador en GitHub Pages cada vez que se actualiza la rama main.
+# Requisito (una sola vez): Settings → Pages → Source: "GitHub Actions".
+name: Desplegar en GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Ejecutar las pruebas
+        run: dotnet test tests/SimuladorCloud.Tests/SimuladorCloud.Tests.csproj -c Release
+
+      - name: Publicar la aplicación
+        run: dotnet publish src/SimuladorCloud.Client/SimuladorCloud.Client.csproj -c Release -o publish
+
+      - name: Ajustar la ruta base para GitHub Pages
+        run: python3 .github/scripts/ajustar_pages.py publish/wwwroot "/${GITHUB_REPOSITORY#*/}/"
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir el sitio
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar
+        id: deployment
+        uses: actions/deploy-pages@v4

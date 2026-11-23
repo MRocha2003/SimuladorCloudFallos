@@ -162,9 +162,26 @@
             </button>
         </div>
 
-        <button id="btn-clear" class="btn btn-outline-danger w-100" @onclick="ClearGraph">
-            🗑 Limpiar todo
-        </button>
+        <!-- IT-7 · HU-14: limpieza con confirmación si hay una topología activa -->
+        @if (_confirmClear)
+        {
+            <div id="clear-confirm" class="clear-confirm">
+                <div class="small mb-2">
+                    Se eliminarán @GraphService.Graph.NodeCount nodos, @GraphService.Graph.EdgeCount dependencias
+                    y los resultados. Las topologías guardadas no se borran. ¿Continuar?
+                </div>
+                <div class="d-flex gap-2">
+                    <button id="btn-clear-confirm" class="btn btn-danger btn-sm flex-fill" @onclick="ClearGraph">Sí, limpiar</button>
+                    <button id="btn-clear-cancel" class="btn btn-outline-secondary btn-sm flex-fill" @onclick="() => _confirmClear = false">Cancelar</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <button id="btn-clear" class="btn btn-outline-danger w-100" @onclick="RequestClear">
+                🗑 Limpiar todo
+            </button>
+        }
     </div>
 
     <!-- ── Canvas SVG: visualización interactiva del grafo (IT-2 · HU-03) ── -->
@@ -601,8 +618,21 @@
         ClearResults();
     }
 
+    private bool _confirmClear;
+
+    /// <summary>
+    /// Solicita confirmación antes de limpiar si hay una topología activa;
+    /// si el canvas ya está vacío, limpia directamente (HU-14).
+    /// </summary>
+    private void RequestClear()
+    {
+        if (GraphService.Graph.NodeCount > 0) _confirmClear = true;
+        else ClearGraph();
+    }
+
     private void ClearGraph()
     {
+        _confirmClear = false;
         GraphService.ClearGraph();
         _selectedNodeId = _edgeSourceId = _edgeTargetId = _edgeMessage = _saveMessage = string.Empty;
         _topologyName = GraphService.Graph.Name;
@@ -611,6 +641,7 @@
 
     private void LoadPredefined(int index)
     {
+        _confirmClear = false;
         GraphService.LoadPredefinedTopology(index);
         _selectedNodeId = _edgeSourceId = _edgeTargetId = _edgeMessage = _saveMessage = string.Empty;
         _topologyName = GraphService.Graph.Name;

@@ -22,6 +22,8 @@ public class TopologyStorageService
         WriteIndented               = false
     };
 
+    /// <summary>Crea el servicio.</summary>
+    /// <param name="store">Almacén clave–valor (localStorage en el navegador).</param>
     public TopologyStorageService(IKeyValueStore store)
     {
         _store = store;

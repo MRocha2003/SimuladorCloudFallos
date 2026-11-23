@@ -28,6 +28,9 @@ builder.Services.AddSingleton<CriticalPathService>();
 builder.Services.AddSingleton<ReportService>();
 builder.Services.AddSingleton<AlertService>();
 
+// Validación funcional de los algoritmos sobre las topologías predefinidas (IT-7)
+builder.Services.AddSingleton<AlgorithmValidationService>();
+
 // Persistencia de topologías y resultados (RF-10, RF-11)
 builder.Services.AddScoped<TopologyStorageService>();
 

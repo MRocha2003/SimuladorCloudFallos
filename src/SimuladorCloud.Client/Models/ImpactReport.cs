@@ -94,16 +94,28 @@ public class ImpactReport
 /// <summary>SPOF tal como aparece en el reporte.</summary>
 public class ReportSpof
 {
+    /// <summary>Nombre del SPOF.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Tipo de componente del SPOF.</summary>
     public NodeType Type { get; set; }
+
+    /// <summary>Nombres de los nodos que quedarían desconectados.</summary>
     public List<string> DisconnectedNames { get; set; } = new();
+
+    /// <summary>Número de nodos que fallarían en cascada.</summary>
     public int CascadeCount { get; set; }
 }
 
 /// <summary>Ruta crítica tal como aparece en el reporte.</summary>
 public class ReportPath
 {
+    /// <summary>Nombres de los nodos de la ruta, en orden.</summary>
     public List<string> NodeNames { get; set; } = new();
+
+    /// <summary>Longitud de la ruta en número de aristas.</summary>
     public int Length => Math.Max(0, NodeNames.Count - 1);
+
+    /// <summary>Número de SPOF que atraviesa la ruta.</summary>
     public int SpofCount { get; set; }
 }

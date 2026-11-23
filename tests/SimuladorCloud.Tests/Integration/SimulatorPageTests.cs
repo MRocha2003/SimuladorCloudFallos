@@ -240,6 +240,7 @@ public class SimulatorPageTests : TestContext
         var cut = Render();
 
         cut.Find("#btn-clear").Click();
+        cut.Find("#btn-clear-confirm").Click();   // IT-7 · HU-14: confirmación
 
         Assert.Empty(cut.FindAll("g.graph-node"));
     }
