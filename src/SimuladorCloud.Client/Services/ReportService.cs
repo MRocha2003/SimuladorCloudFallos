@@ -11,6 +11,8 @@ public class ReportService
 {
     private readonly GraphService _graphService;
 
+    /// <summary>Crea el servicio.</summary>
+    /// <param name="graphService">Servicio que contiene el grafo actual.</param>
     public ReportService(GraphService graphService)
     {
         _graphService = graphService;

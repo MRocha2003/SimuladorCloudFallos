@@ -5,7 +5,20 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SimuladorCloud.Client</RootNamespace>
+
+    <!-- IT-8 · HU-16: documentación XML de servicios y modelos (PT-35).
+         CS1591 se omite porque los componentes Razor generan miembros públicos sin comentarios;
+         la cobertura de servicios y modelos se verifica con una prueba unitaria. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- IT-8 · HU-15: aplicación web progresiva — funcionamiento sin conexión (PT-32) -->
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.0" />

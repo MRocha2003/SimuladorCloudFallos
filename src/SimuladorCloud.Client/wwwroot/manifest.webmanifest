@@ -1,0 +1,16 @@
+{
+  "name": "SimuladorCloud — Simulador de Fallos en Cascada",
+  "short_name": "SimuladorCloud",
+  "description": "Simulador web de fallos en cascada basado en teoría de grafos para la gestión preventiva de riesgos en ecosistemas Cloud públicos.",
+  "lang": "es",
+  "id": "./",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0B1F4B",
+  "theme_color": "#0B1F4B",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}

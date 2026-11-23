@@ -28,17 +28,22 @@ public class LocalStorageKeyValueStore : IKeyValueStore
 {
     private readonly ILocalStorageService _localStorage;
 
+    /// <summary>Crea el servicio.</summary>
+    /// <param name="localStorage">Servicio de Blazored.LocalStorage.</param>
     public LocalStorageKeyValueStore(ILocalStorageService localStorage)
     {
         _localStorage = localStorage;
     }
 
+    /// <inheritdoc />
     public async Task<string?> GetStringAsync(string key) =>
         await _localStorage.GetItemAsStringAsync(key);
 
+    /// <inheritdoc />
     public async Task SetStringAsync(string key, string value) =>
         await _localStorage.SetItemAsStringAsync(key, value);
 
+    /// <inheritdoc />
     public async Task RemoveAsync(string key) =>
         await _localStorage.RemoveItemAsync(key);
 }

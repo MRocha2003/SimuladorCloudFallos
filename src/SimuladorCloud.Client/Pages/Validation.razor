@@ -1,0 +1,119 @@
+@page "/validation"
+@inject AlgorithmValidationService ValidationService
+
+@*
+    Página de validación funcional de los algoritmos.
+    IT-7 · HU-13: los algoritmos se ejecutan sobre las 4 topologías predefinidas
+    y se comparan con la verificación manual (PT-26 a PT-29).
+    IT-8 · HU-15: tiempos medidos en el propio navegador (PT-30 y PT-34).
+*@
+
+<PageTitle>Validación · SimuladorCloud</PageTitle>
+
+<div class="validation-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h4 class="mb-1">Validación funcional de los algoritmos</h4>
+            <p class="text-muted small mb-0">
+                Ejecuta BFS (cascada), Tarjan (SPOF) y rutas críticas sobre las cuatro topologías
+                predefinidas y compara los resultados con la verificación manual. No modifica la
+                topología abierta en el simulador.
+            </p>
+        </div>
+        <button id="btn-run-validation" class="btn btn-primary" disabled="@_running" @onclick="RunValidation">
+            @(_running ? "Validando…" : "▶ Ejecutar validación")
+        </button>
+    </div>
+
+    <p id="validation-environment" class="small mb-3">
+        <strong>Entorno de ejecución:</strong>
+        @(AlgorithmValidationService.RunningInBrowser
+            ? "WebAssembly en el navegador (sin llamadas al servidor)"
+            : ".NET fuera del navegador")
+        · <strong>Límite de tiempo:</strong> @AlgorithmValidationService.TimeLimitMs ms por operación
+        · <strong>Mediciones:</strong> mediana de @AlgorithmValidationService.TimingRuns ejecuciones
+    </p>
+
+    @if (_results.Count > 0)
+    {
+        <div id="validation-summary" class="alert @(_results.All(r => r.Passed) ? "alert-success" : "alert-danger") py-2">
+            @_results.Count(r => r.Passed) de @_results.Count escenarios superan todas las comprobaciones.
+        </div>
+
+        <div class="table-responsive">
+            <table id="validation-table" class="table table-sm align-middle validation-table">
+                <thead>
+                    <tr>
+                        <th>Topología</th>
+                        <th class="text-center">Nodos / aristas</th>
+                        <th class="text-center">SPOF (detectados / esperados)</th>
+                        <th class="text-center">Cascadas</th>
+                        <th class="text-center">Reproducible</th>
+                        <th class="text-end">Cascada (ms)</th>
+                        <th class="text-end">SPOF (ms)</th>
+                        <th class="text-end">Rutas (ms)</th>
+                        <th class="text-center">Resultado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _results)
+                    {
+                        <tr class="validation-row">
+                            <td>@r.TopologyName</td>
+                            <td class="text-center">@r.NodeCount / @r.EdgeCount</td>
+                            <td class="text-center">@Mark(r.SpofsMatch) @r.DetectedSpofCount / @r.ExpectedSpofCount</td>
+                            <td class="text-center" title="@string.Join("; ", r.CascadeChecks.Select(c => $"{c.Origin}: {c.ActualAffected}/{c.ExpectedAffected}"))">
+                                @Mark(r.CascadeMatch) @r.CascadeChecks.Count(c => c.Passed) / @r.CascadeChecks.Count
+                            </td>
+                            <td class="text-center">@Mark(r.Reproducible)</td>
+                            <td class="text-end">@Ms(r.CascadeMs)</td>
+                            <td class="text-end">@Ms(r.SpofMs)</td>
+                            <td class="text-end">@Ms(r.CriticalPathMs)</td>
+                            <td class="text-center">
+                                <span class="badge @(r.Passed ? "bg-success" : "bg-danger")">@(r.Passed ? "Superada" : "Fallida")</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @foreach (var r in _results.Where(r => !r.SpofsMatch))
+        {
+            <p class="small text-danger">
+                @r.TopologyName — no detectados: @string.Join(", ", r.MissingSpofs);
+                no esperados: @string.Join(", ", r.UnexpectedSpofs)
+            </p>
+        }
+
+        <p class="small text-muted">
+            Las comprobaciones corresponden a las pruebas de aceptación PT-26 a PT-30 y PT-34.
+            Para la prueba en varios navegadores (HU-15), ejecute esta validación en Chrome, Firefox y Edge.
+        </p>
+    }
+</div>
+
+@code {
+    private List<ValidationResult> _results = new();
+    private bool _running;
+
+    private async Task RunValidation()
+    {
+        _running = true;
+        _results = new();
+        StateHasChanged();
+        await Task.Yield();   // permite mostrar el estado «Validando…» antes del cálculo
+
+        for (int scenario = 0; scenario < 4; scenario++)
+        {
+            _results.Add(ValidationService.Run(scenario));
+            StateHasChanged();
+            await Task.Yield();
+        }
+        _running = false;
+    }
+
+    private static string Mark(bool ok) => ok ? "✔" : "✘";
+
+    private static string Ms(double value) => value.ToString("F2");
+}

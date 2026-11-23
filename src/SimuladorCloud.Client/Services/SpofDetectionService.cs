@@ -26,6 +26,8 @@ public class SpofDetectionService
     private bool[]       _isSpof    = Array.Empty<bool>();
     private List<int>[]  _adjacency = Array.Empty<List<int>>();
 
+    /// <summary>Crea el servicio.</summary>
+    /// <param name="graphService">Servicio que contiene el grafo actual.</param>
     public SpofDetectionService(GraphService graphService)
     {
         _graphService = graphService;
@@ -89,64 +91,155 @@ public class SpofDetectionService
     /// </summary>
     public SpofImpact AnalyzeImpact(string vertexId)
     {
-        var graph  = _graphService.Graph;
-        var vertex = graph.GetVertex(vertexId);
-        if (vertex is null) return new SpofImpact { VertexId = vertexId };
-
-        var impact = new SpofImpact
-        {
-            VertexId        = vertex.Id,
-            VertexName      = vertex.Name,
-            NodeType        = vertex.NodeType,
-            CascadeAffected = graph.GetTransitiveDependents(vertexId)
-                                   .OrderBy(id => graph.GetVertex(id)?.Name)
-                                   .ToList()
-        };
-
-        // Componente del nodo en el grafo completo
-        var fullAdjacency = BuildUndirectedAdjacency(graph, excludedId: null, out var index);
-        var component     = Reach(fullAdjacency, index[vertexId], blocked: -1);
-
-        // Componentes que quedan dentro de ese mismo componente sin el nodo
-        int removed   = index[vertexId];
-        var seen      = new bool[graph.Vertices.Count];
-        var pieces    = new List<List<int>>();
-        foreach (int start in component)
-        {
-            if (start == removed || seen[start]) continue;
-            var piece = Reach(fullAdjacency, start, blocked: removed);
-            foreach (int p in piece) seen[p] = true;
-            pieces.Add(piece);
-        }
-
-        int otherComponents = CountComponents(fullAdjacency) - 1; // sin contar el del nodo
-        impact.ComponentsAfterRemoval = otherComponents + pieces.Count;
-
-        // El fragmento más grande se considera el sistema principal;
-        // los demás quedan desconectados.
-        var main = pieces.OrderByDescending(p => p.Count).FirstOrDefault() ?? new List<int>();
-        impact.DisconnectedNodes = pieces.Where(p => !ReferenceEquals(p, main))
-                                         .SelectMany(p => p)
-                                         .Select(i => graph.Vertices[i])
-                                         .OrderBy(v => v.Name)
-                                         .Select(v => v.Id)
-                                         .ToList();
-        return impact;
+        var graph = _graphService.Graph;
+        if (graph.GetVertex(vertexId) is null) return new SpofImpact { VertexId = vertexId };
+        return AnalyzeImpact(new ImpactContext(graph), vertexId);
     }
 
     /// <summary>
     /// Calcula el impacto de todos los SPOF del último análisis (o ejecuta
     /// el análisis si aún no se hizo) y los ordena de mayor a menor criticidad.
+    /// Las estructuras auxiliares se construyen una sola vez para todos los SPOF.
     /// </summary>
     public List<SpofImpact> AnalyzeAllImpacts()
     {
         var graph = _graphService.Graph;
         if (graph.Spofs.Count == 0) DetectSpofs();
+        if (graph.Spofs.Count == 0) return new List<SpofImpact>();
+
+        var context = new ImpactContext(graph);
         return graph.Spofs
-                    .Select(AnalyzeImpact)
+                    .Select(id => AnalyzeImpact(context, id))
                     .OrderByDescending(i => i.CriticalityScore)
                     .ThenBy(i => i.VertexName)
                     .ToList();
+    }
+
+    private static SpofImpact AnalyzeImpact(ImpactContext ctx, string vertexId)
+    {
+        var graph   = ctx.Graph;
+        int removed = ctx.Index[vertexId];
+        var vertex  = graph.Vertices[removed];
+
+        // Cascada: nodos que dependen (directa o indirectamente) del nodo
+        var cascade = ctx.TransitiveDependents(removed)
+                         .Select(i => graph.Vertices[i])
+                         .OrderBy(v => v.Name)
+                         .Select(v => v.Id)
+                         .ToList();
+
+        // Desconexión: fragmentos en que se divide el componente del nodo al quitarlo
+        var pieces = new List<List<int>>();
+        int stamp  = ctx.NewStamp();
+        ctx.Mark[removed] = stamp;
+        foreach (int start in ctx.Adjacency[removed])
+        {
+            if (ctx.Mark[start] == stamp) continue;
+            pieces.Add(ctx.Reach(start, stamp));
+        }
+
+        var main = pieces.OrderByDescending(p => p.Count).FirstOrDefault() ?? new List<int>();
+        return new SpofImpact
+        {
+            VertexId               = vertex.Id,
+            VertexName             = vertex.Name,
+            NodeType               = vertex.NodeType,
+            CascadeAffected        = cascade,
+            ComponentsAfterRemoval = ctx.ComponentCount - 1 + pieces.Count,
+            DisconnectedNodes      = pieces.Where(p => !ReferenceEquals(p, main))
+                                           .SelectMany(p => p)
+                                           .Select(i => graph.Vertices[i])
+                                           .OrderBy(v => v.Name)
+                                           .Select(v => v.Id)
+                                           .ToList()
+        };
+    }
+
+    /// <summary>
+    /// Estructuras auxiliares para el análisis de impacto: índice de nodos,
+    /// adyacencia no dirigida, dependientes directos y número de componentes.
+    /// Se reutilizan marcas por "sello" para evitar asignar memoria en cada recorrido.
+    /// </summary>
+    private sealed class ImpactContext
+    {
+        public GraphModel Graph { get; }
+        public Dictionary<string, int> Index { get; }
+        public List<int>[] Adjacency { get; }
+        public List<int>[] Dependents { get; }
+        public int ComponentCount { get; }
+        public int[] Mark { get; }
+        private int _stamp;
+        private readonly Queue<int> _queue = new();
+
+        public ImpactContext(GraphModel graph)
+        {
+            Graph     = graph;
+            Adjacency = BuildUndirectedAdjacency(graph, excludedId: null, out var index);
+            Index     = index;
+            int n     = graph.Vertices.Count;
+            Mark      = new int[n];
+
+            Dependents = new List<int>[n];
+            for (int i = 0; i < n; i++) Dependents[i] = new List<int>();
+            foreach (var e in graph.Edges)
+                if (e.IsActive && index.TryGetValue(e.SourceId, out int s) && index.TryGetValue(e.TargetId, out int t) && s != t)
+                    Dependents[t].Add(s);
+
+            int stamp = NewStamp(), count = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (Mark[i] == stamp) continue;
+                count++;
+                Mark[i] = stamp;
+                Reach(i, stamp);
+            }
+            ComponentCount = count;
+        }
+
+        public int NewStamp() => ++_stamp;
+
+        /// <summary>BFS no dirigido desde start sobre los nodos aún no marcados con el sello.</summary>
+        public List<int> Reach(int start, int stamp)
+        {
+            var result = new List<int> { start };
+            Mark[start] = stamp;
+            _queue.Clear();
+            _queue.Enqueue(start);
+            while (_queue.Count > 0)
+            {
+                int u = _queue.Dequeue();
+                foreach (int v in Adjacency[u])
+                {
+                    if (Mark[v] == stamp) continue;
+                    Mark[v] = stamp;
+                    result.Add(v);
+                    _queue.Enqueue(v);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>BFS por las aristas activas entrantes: dependientes transitivos del nodo.</summary>
+        public List<int> TransitiveDependents(int origin)
+        {
+            int stamp  = NewStamp();
+            var result = new List<int>();
+            Mark[origin] = stamp;
+            _queue.Clear();
+            _queue.Enqueue(origin);
+            while (_queue.Count > 0)
+            {
+                int u = _queue.Dequeue();
+                foreach (int d in Dependents[u])
+                {
+                    if (Mark[d] == stamp) continue;
+                    Mark[d] = stamp;
+                    result.Add(d);
+                    _queue.Enqueue(d);
+                }
+            }
+            return result;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -216,42 +309,5 @@ public class SpofDetectionService
         var adjacency = new List<int>[n];
         for (int i = 0; i < n; i++) adjacency[i] = sets[i].OrderBy(x => x).ToList();
         return adjacency;
-    }
-
-    /// <summary>Nodos alcanzables desde start sin pasar por el nodo bloqueado (BFS).</summary>
-    private static List<int> Reach(List<int>[] adjacency, int start, int blocked)
-    {
-        var result  = new List<int> { start };
-        var visited = new bool[adjacency.Length];
-        visited[start] = true;
-        if (blocked >= 0) visited[blocked] = true;
-        var queue = new Queue<int>();
-        queue.Enqueue(start);
-        while (queue.Count > 0)
-        {
-            int u = queue.Dequeue();
-            foreach (int v in adjacency[u])
-            {
-                if (visited[v]) continue;
-                visited[v] = true;
-                result.Add(v);
-                queue.Enqueue(v);
-            }
-        }
-        return result;
-    }
-
-    /// <summary>Número de componentes conexas del grafo no dirigido.</summary>
-    private static int CountComponents(List<int>[] adjacency)
-    {
-        var seen  = new bool[adjacency.Length];
-        int count = 0;
-        for (int i = 0; i < adjacency.Length; i++)
-        {
-            if (seen[i]) continue;
-            count++;
-            foreach (int v in Reach(adjacency, i, blocked: -1)) seen[v] = true;
-        }
-        return count;
     }
 }
