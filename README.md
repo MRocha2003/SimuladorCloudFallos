@@ -75,13 +75,22 @@ SimuladorCloudFallos/
 ### 2. Detección de SPOFs — Algoritmo de Tarjan (IT-4)
 - **Complejidad:** O(V+E)
 - **Descripción:** Identifica puntos de articulación del grafo — nodos cuya
-  eliminación incrementa el número de componentes conexas.
+  eliminación incrementa el número de componentes conexas. Para cada SPOF
+  calcula su impacto: nodos que quedarían desconectados y nodos que fallarían
+  en cascada.
 - **Archivo:** `Services/SpofDetectionService.cs`
 
-### 3. Análisis de rutas críticas (IT-5)
-- **Descripción:** Identifica rutas de mayor profundidad ponderadas por
-  centralidad de intermediación.
-- **Estado:** En desarrollo (IT-5)
+### 3. Rutas críticas (IT-4 / IT-5)
+- **Complejidad:** O(V+E)
+- **Descripción:** Cadena de dependencias más larga desde un punto de entrada
+  (nodo del que nadie depende) hasta una dependencia final. Se rompen los
+  ciclos descartando aristas de retroceso (DFS) y se calcula el camino más
+  largo por programación dinámica. Se priorizan las rutas que atraviesan más SPOF.
+- **Archivo:** `Services/CriticalPathService.cs`
+
+### 4. Reporte de impacto y alertas (IT-5 / IT-6)
+- `Services/ReportService.cs`: reporte estructurado (nodo inicial, afectados, SPOFs y rutas críticas) copiable en texto.
+- `Services/AlertService.cs`: alertas no bloqueantes por SPOF y por cascada crítica (más del 50% de los nodos).
 
 ---
 
@@ -89,12 +98,12 @@ SimuladorCloudFallos/
 
 | Iteración | Semanas | Estado | Entregable |
 |---|---|---|---|
-| **IT-1** | 1–2 | ✅ En progreso | Modelo G=(V,E) — CRUD nodos y aristas |
-| **IT-2** | 3–4 | 🔲 Pendiente | Canvas SVG + localStorage |
-| **IT-3** | 5–6 | 🔲 Pendiente | Motor BFS/DFS de cascadas |
-| **IT-4** | 7–8 | 🔲 Pendiente | Algoritmo de Tarjan — SPOFs |
-| **IT-5** | 9–10 | 🔲 Pendiente | Rutas críticas + Reportes |
-| **IT-6** | 11–12 | 🔲 Pendiente | Interfaz completa + Alertas |
+| **IT-1** | 1–2 | ✅ Completada | Modelo G=(V,E) — CRUD nodos y aristas |
+| **IT-2** | 3–4 | ✅ Completada | Canvas SVG + localStorage |
+| **IT-3** | 5–6 | ✅ Completada | Motor BFS de cascadas |
+| **IT-4** | 7–8 | ✅ Completada | Algoritmo de Tarjan — SPOFs, impacto y rutas críticas |
+| **IT-5** | 9–10 | ✅ Completada | Reporte de impacto + panel de resultados colapsable |
+| **IT-6** | 11–12 | ✅ Completada | Escenarios de 50 y 100 nodos + alertas visuales |
 | **IT-7** | 13–14 | 🔲 Pendiente | Pruebas funcionales |
 | **IT-8** | 15–16 | 🔲 Pendiente | Optimización WASM + Documentación |
 
@@ -156,12 +165,15 @@ public class Edge {
 
 ## 🧪 Escenarios de prueba predefinidos
 
-| Escenario | Nodos | Aristas | SPOFs esperados |
+| Escenario | Nodos | Aristas | SPOFs |
 |---|---|---|---|
-| Pequeño | 8 | 10 | 2 |
-| Mediano | 20 | 28 | 4 |
-| Grande | 50 | 73 | 7 |
-| Complejo | 100 | 148 | 11 |
+| Pequeño | 8 | 10 | 1 |
+| Mediano | 20 | 28 | 3 |
+| Grande | 50 | 72 | 14 |
+| Complejo | 100 | 150 | 33 |
+
+Los SPOF y el alcance de la cascada de cada escenario se verificaron con una
+implementación independiente (NetworkX) y están cubiertos por pruebas unitarias.
 
 **Tiempo de respuesta objetivo:** < 120 ms en todos los escenarios (WASM, Chrome)
 

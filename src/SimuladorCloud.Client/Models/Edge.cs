@@ -41,14 +41,27 @@ public class Edge
     /// </summary>
     public bool IsCascadePath { get; set; } = false;
 
+    /// <summary>
+    /// Indica si esta arista forma parte de una ruta crítica identificada
+    /// en el último análisis (IT-4 · HU-08).
+    /// </summary>
+    public bool IsCriticalPath { get; set; } = false;
+
     // ── Propiedades de conveniencia ────────────────────────────────────────────
 
-    /// <summary>Color de la arista según su estado en la simulación.</summary>
-    public string StrokeColor => IsCascadePath ? "#E53E3E"  // rojo — en cascada
-                                               : "#718096"; // gris — normal
+    /// <summary>
+    /// Color de la arista según su estado en la simulación: rojo si propaga
+    /// la cascada, violeta si pertenece a una ruta crítica y gris en otro caso.
+    /// </summary>
+    public string StrokeColor => IsCascadePath  ? "#E53E3E"  // rojo — en cascada
+                               : IsCriticalPath ? "#805AD5"  // violeta — ruta crítica
+                                                : "#718096"; // gris — normal
 
     /// <summary>Grosor de la arista según su estado.</summary>
-    public int StrokeWidth => IsCascadePath ? 2 : 1;
+    public int StrokeWidth => IsCascadePath ? 2 : IsCriticalPath ? 3 : 1;
+
+    /// <summary>Marcador de flecha SVG que corresponde al estado de la arista.</summary>
+    public string MarkerId => IsCascadePath ? "arrow-red" : IsCriticalPath ? "arrow-purple" : "arrow";
 
     /// <summary>
     /// Crea una copia superficial de la arista.
@@ -60,6 +73,7 @@ public class Edge
         TargetId      = TargetId,
         Weight        = Weight,
         IsActive      = IsActive,
-        IsCascadePath = IsCascadePath
+        IsCascadePath  = IsCascadePath,
+        IsCriticalPath = IsCriticalPath
     };
 }

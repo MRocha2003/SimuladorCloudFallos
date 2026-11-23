@@ -93,6 +93,13 @@ public class CascadeSimulationService
     }
 
     /// <summary>
+    /// Calcula los nodos que fallarían en cascada sin modificar el estado
+    /// del grafo (útil para estimar el impacto de un nodo).
+    /// </summary>
+    public HashSet<string> ComputeAffected(string originVertexId) =>
+        _graphService.Graph.GetTransitiveDependents(originVertexId);
+
+    /// <summary>
     /// Inyecta un fallo en un nodo sin propagar la cascada.
     /// Útil para marcar múltiples nodos fallidos antes de iniciar la simulación.
     /// HU-05 — Criterio de aceptación 2.

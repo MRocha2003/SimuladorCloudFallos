@@ -104,6 +104,37 @@ public class GraphModel
             .Cast<Vertex>();
 
     /// <summary>
+    /// Calcula, sin modificar el estado del grafo, los nodos que fallarían
+    /// en cascada si falla el nodo dado: todos los que dependen de él directa
+    /// o indirectamente siguiendo las aristas activas entrantes (BFS, O(V+E)).
+    /// El nodo de origen no se incluye en el resultado.
+    /// </summary>
+    public HashSet<string> GetTransitiveDependents(string vertexId)
+    {
+        var incoming = new Dictionary<string, List<string>>();
+        foreach (var e in Edges)
+        {
+            if (!e.IsActive) continue;
+            if (!incoming.TryGetValue(e.TargetId, out var list))
+                incoming[e.TargetId] = list = new List<string>();
+            list.Add(e.SourceId);
+        }
+
+        var visited = new HashSet<string> { vertexId };
+        var queue   = new Queue<string>();
+        queue.Enqueue(vertexId);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!incoming.TryGetValue(current, out var dependents)) continue;
+            foreach (var d in dependents)
+                if (visited.Add(d)) queue.Enqueue(d);
+        }
+        visited.Remove(vertexId);
+        return visited;
+    }
+
+    /// <summary>
     /// Reinicia el estado de todos los nodos y aristas a su estado inicial.
     /// </summary>
     public void ResetSimulation()
@@ -115,7 +146,8 @@ public class GraphModel
         }
         foreach (var edge in Edges)
         {
-            edge.IsCascadePath = false;
+            edge.IsCascadePath  = false;
+            edge.IsCriticalPath = false;
         }
         Spofs.Clear();
         CriticalPaths.Clear();

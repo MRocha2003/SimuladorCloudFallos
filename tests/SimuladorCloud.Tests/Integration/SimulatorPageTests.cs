@@ -26,6 +26,9 @@ public class SimulatorPageTests : TestContext
         Services.AddSingleton<SpofDetectionService>();
         Services.AddSingleton<IKeyValueStore>(_store);
         Services.AddSingleton<TopologyStorageService>();
+        Services.AddSingleton<CriticalPathService>();   // IT-4
+        Services.AddSingleton<ReportService>();         // IT-5
+        Services.AddSingleton<AlertService>();          // IT-6
         JSInterop.Mode = JSRuntimeMode.Loose;   // navigator.clipboard en "Copiar reporte"
     }
 
