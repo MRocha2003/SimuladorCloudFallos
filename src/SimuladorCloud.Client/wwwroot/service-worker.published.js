@@ -15,17 +15,23 @@ const offlineAssetsInclude = [/\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /
 const offlineAssetsExclude = [/^service-worker\.js$/];
 
 // Ruta base de la aplicación: la carpeta donde está este service worker.
-// Funciona igual en localhost ("/") y en GitHub Pages ("/simuladorcloudfallos/").
+// Funciona igual en localhost ("/") y en GitHub Pages ("/SimuladorCloudFallos/").
 const baseUrl = new URL('./', self.location);
+const indexUrl = new URL('index.html', baseUrl).href;
 const manifestUrlList = self.assetsManifest.assets.map(asset => new URL(asset.url, baseUrl).href);
 
 async function onInstall(event) {
     console.info('Service worker: instalación');
+    // index.html se descarga sin comprobación de integridad, porque el despliegue
+    // en GitHub Pages ajusta su <base href> después de compilar.
     const assetsRequests = self.assetsManifest.assets
         .filter(asset => offlineAssetsInclude.some(pattern => pattern.test(asset.url)))
         .filter(asset => !offlineAssetsExclude.some(pattern => pattern.test(asset.url)))
-        .map(asset => new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
+        .map(asset => asset.url === 'index.html'
+            ? new Request(asset.url, { cache: 'no-cache' })
+            : new Request(asset.url, { integrity: asset.hash, cache: 'no-cache' }));
     await caches.open(cacheName).then(cache => cache.addAll(assetsRequests));
+    self.skipWaiting();
 }
 
 async function onActivate(event) {
@@ -34,17 +40,35 @@ async function onActivate(event) {
     await Promise.all(cacheKeys
         .filter(key => key.startsWith(cacheNamePrefix) && key !== cacheName)
         .map(key => caches.delete(key)));
+    await self.clients.claim();
 }
 
 async function onFetch(event) {
-    let cachedResponse = null;
-    if (event.request.method === 'GET') {
-        // Las navegaciones a rutas de la aplicación (/simulator, /validation…) se resuelven con index.html
-        const shouldServeIndexHtml = event.request.mode === 'navigate'
-            && !manifestUrlList.some(url => url === event.request.url);
-        const request = shouldServeIndexHtml ? 'index.html' : event.request;
-        const cache = await caches.open(cacheName);
-        cachedResponse = await cache.match(request);
+    const request = event.request;
+    if (request.method !== 'GET') {
+        return fetch(request);
     }
-    return cachedResponse || fetch(event.request);
+    const cache = await caches.open(cacheName);
+    // Las navegaciones a rutas de la aplicación (/simulator, /validation…) se resuelven con index.html
+    const isAppRoute = request.mode === 'navigate' && !manifestUrlList.some(url => url === request.url);
+    if (isAppRoute) {
+        const cachedIndex = await cache.match(indexUrl);
+        if (cachedIndex) {
+            return cachedIndex;
+        }
+        try {
+            return await fetch(indexUrl, { cache: 'no-cache' });
+        } catch {
+            return Response.error();
+        }
+    }
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+        return cachedResponse;
+    }
+    try {
+        return await fetch(request);
+    } catch {
+        return Response.error();
+    }
 }

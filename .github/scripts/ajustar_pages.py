@@ -23,5 +23,6 @@ assets = root / "service-worker-assets.js"
 if assets.exists():
     text = assets.read_text(encoding="utf-8")
     text = re.sub(r'("hash":\s*")[^"]*(",\s*"url":\s*"index\.html")', rf'\g<1>{digest}\g<2>', text)
+    text = re.sub(r'("url":\s*"index\.html",\s*"hash":\s*")[^"]*(")', rf'\g<1>{digest}\g<2>', text)
     assets.write_text(text, encoding="utf-8")
 print(f"Ruta base: {base}  ·  hash de index.html: {digest}")
